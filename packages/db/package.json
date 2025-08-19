@@ -39,9 +39,9 @@
 	},
 	"devDependencies": {
 		"@draftlab/tsconfig": "workspace:*",
-		"@types/node": "^24.0.10",
+		"@types/node": "^24.3.0",
 		"tsdown": "^0.14.1",
-		"typescript": "^5.8.3"
+		"typescript": "^5.9.2"
 	},
 	"dependencies": {
 		"@sqlite.org/sqlite-wasm": "3.50.4-build1"
