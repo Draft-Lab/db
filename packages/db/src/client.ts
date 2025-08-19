@@ -26,7 +26,7 @@ export class Client {
 		}
 	}
 
-	sql<T extends Record<string, SQLValue>>(
+	sql<T = Record<string, SQLValue>>(
 		queryTemplate: TemplateStringsArray | string,
 		...params: SQLValue[]
 	): T[] {
@@ -38,17 +38,14 @@ export class Client {
 		return this.convertToObjects<T>(result)
 	}
 
-	query<T extends Record<string, SQLValue>>(sql: string, params: SQLValue[] = []): T[] {
+	query<T = Record<string, SQLValue>>(sql: string, params: SQLValue[] = []): T[] {
 		this.ensureReady()
 
 		const result = this.db.exec({ sql, params, method: "all" })
 		return this.convertToObjects<T>(result)
 	}
 
-	get<T extends Record<string, SQLValue>>(
-		sql: string,
-		params: SQLValue[] = []
-	): T | undefined {
+	get<T = Record<string, SQLValue>>(sql: string, params: SQLValue[] = []): T | undefined {
 		this.ensureReady()
 
 		const result = this.db.exec({ sql, params, method: "get" })
@@ -130,7 +127,7 @@ export class Client {
 		return sql
 	}
 
-	private convertToObjects<T extends Record<string, SQLValue>>(result: {
+	private convertToObjects<T = Record<string, SQLValue>>(result: {
 		rows: SQLValue[][] | SQLValue[]
 		columns: string[]
 	}): T[] {
@@ -159,10 +156,10 @@ export class Client {
 }
 
 interface TransactionInterface {
-	sql<T extends Record<string, SQLValue>>(
+	sql<T = Record<string, SQLValue>>(
 		queryTemplate: TemplateStringsArray | string,
 		...params: SQLValue[]
 	): T[]
-	query<T extends Record<string, SQLValue>>(sql: string, params?: SQLValue[]): T[]
+	query<T = Record<string, SQLValue>>(sql: string, params?: SQLValue[]): T[]
 	run(sql: string, params?: SQLValue[]): void
 }
