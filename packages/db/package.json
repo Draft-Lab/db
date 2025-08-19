@@ -1,0 +1,55 @@
+{
+	"name": "@draftlab/db",
+	"version": "0.1.0",
+	"type": "module",
+	"description": "Core implementation for @draftlab/db",
+	"author": "Matheus Pergoli",
+	"main": "dist/index.js",
+	"typings": "dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"sideEffects": false,
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Draft-Lab/db.git"
+	},
+	"bugs": {
+		"url": "https://github.com/Draft-Lab/db/issues"
+	},
+	"homepage": "https://github.com/Draft-Lab/db",
+	"keywords": [
+		"local-first",
+		"sqlite",
+		"database",
+		"draftlab",
+		"typescript"
+	],
+	"license": "MIT",
+	"scripts": {
+		"build": "tsdown",
+		"clean": "rm -rf dist .turbo node_modules",
+		"typecheck": "tsc --noEmit --emitDeclarationOnly false"
+	},
+	"devDependencies": {
+		"@draftlab/tsconfig": "workspace:*",
+		"@types/node": "^24.0.10",
+		"tsdown": "^0.14.1",
+		"typescript": "^5.8.3"
+	},
+	"dependencies": {
+		"@sqlite.org/sqlite-wasm": "3.50.4-build1"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"publishConfig": {
+		"access": "public"
+	}
+}
