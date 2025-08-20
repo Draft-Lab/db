@@ -16,6 +16,8 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 	const [isLoading, setIsLoading] = useState(false)
 
 	const queryFnRef = useRef(queryFn)
+	const hasExecutedRef = useRef(false)
+
 	queryFnRef.current = queryFn
 
 	const executeQuery = useCallback(async (): Promise<void> => {
@@ -35,13 +37,18 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 	}, [enabled, isReady, isClient])
 
 	useEffect(() => {
-		executeQuery()
-	}, [executeQuery])
+		if (!hasExecutedRef.current && enabled && isReady && isClient) {
+			hasExecutedRef.current = true
+			executeQuery()
+		}
 
-	useEffect(() => {
 		if (!queryKey) return
-		return queryClient.subscribe(queryKey, executeQuery)
-	}, [queryKey, executeQuery])
+		return queryClient.subscribe(queryKey, () => {
+			if (enabled && isReady && isClient) {
+				executeQuery()
+			}
+		})
+	}, [queryKey, enabled, isReady, isClient, executeQuery])
 
 	return {
 		data,
