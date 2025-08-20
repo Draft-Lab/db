@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.7.0
+
+### Minor Changes
+
+- change subscribe to arrow fn to preserve this
+
 ## 0.6.0
 
 ### Minor Changes

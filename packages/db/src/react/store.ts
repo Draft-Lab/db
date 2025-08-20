@@ -15,13 +15,6 @@ class LocalStore {
 		this.notifyAll()
 	}
 
-	subscribe(listener: Listener): () => void {
-		this.listeners.add(listener)
-		return () => {
-			this.listeners.delete(listener)
-		}
-	}
-
 	private notifyAll(): void {
 		queueMicrotask(() => {
 			this.listeners.forEach((listener) => {
@@ -34,6 +27,13 @@ class LocalStore {
 		this.queryResults.clear()
 		this.version++
 		this.notifyAll()
+	}
+
+	subscribe = (listener: Listener): (() => void) => {
+		this.listeners.add(listener)
+		return () => {
+			this.listeners.delete(listener)
+		}
 	}
 
 	getSnapshot = () => this.version
