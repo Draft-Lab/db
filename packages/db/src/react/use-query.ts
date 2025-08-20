@@ -13,9 +13,11 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 	const [error, setError] = useState<Error | undefined>(undefined)
 	const [isLoading, setIsLoading] = useState(false)
 
-	const refetchIntervalRef = useRef<NodeJS.Timeout | undefined>()
-	const lastQueryFnRef = useRef<typeof queryFn>()
-	const stableQueryFn = useCallback(queryFn, [queryFn])
+	const queryFnRef = useRef(queryFn)
+	const hasInitializedRef = useRef(false)
+	const refetchIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined)
+
+	queryFnRef.current = queryFn
 
 	const executeQuery = useCallback(async (): Promise<void> => {
 		if (!enabled || !isReady) return
@@ -24,7 +26,7 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 		setError(undefined)
 
 		try {
-			const result = await Promise.resolve(stableQueryFn())
+			const result = await Promise.resolve(queryFnRef.current())
 			setData(result as InferReturn<T>)
 			onSuccess?.(result)
 		} catch (err) {
@@ -34,38 +36,34 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 		} finally {
 			setIsLoading(false)
 		}
-	}, [enabled, isReady, stableQueryFn, onSuccess, onError])
-
-	const refetchRef = useRef<() => void>()
-	refetchRef.current = () => executeQuery()
+	}, [enabled, isReady, onSuccess, onError])
 
 	const refetch = useCallback((): void => {
-		refetchRef.current?.()
-	}, [])
+		executeQuery()
+	}, [executeQuery])
 
 	useEffect(() => {
-		let unsubscribe: (() => void) | undefined
-		if (queryKey) {
-			unsubscribe = queryClient.subscribe(queryKey, refetch)
-		}
+		if (!queryKey) return
+		return queryClient.subscribe(queryKey, refetch)
+	}, [queryKey, refetch])
 
-		if (lastQueryFnRef.current !== stableQueryFn) {
-			lastQueryFnRef.current = stableQueryFn
+	useEffect(() => {
+		if (!hasInitializedRef.current && enabled && isReady) {
+			hasInitializedRef.current = true
 			executeQuery()
 		}
+	}, [enabled, isReady, executeQuery])
 
-		if (refetchInterval && enabled && isReady) {
-			refetchIntervalRef.current = setInterval(executeQuery, refetchInterval)
-		}
+	useEffect(() => {
+		if (!refetchInterval || !enabled || !isReady) return
 
+		refetchIntervalRef.current = setInterval(executeQuery, refetchInterval)
 		return () => {
-			unsubscribe?.()
 			if (refetchIntervalRef.current) {
 				clearInterval(refetchIntervalRef.current)
-				refetchIntervalRef.current = undefined
 			}
 		}
-	}, [queryKey, stableQueryFn, refetchInterval, enabled, isReady, refetch])
+	}, [refetchInterval, enabled, isReady, executeQuery])
 
 	const finalError = error || dbError || undefined
 

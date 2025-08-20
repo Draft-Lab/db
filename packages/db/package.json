@@ -1,6 +1,6 @@
 {
 	"name": "@draftlab/db",
-	"version": "0.3.2",
+	"version": "0.3.3",
 	"type": "module",
 	"description": "Core implementation for @draftlab/db",
 	"author": "Matheus Pergoli",
