@@ -15,6 +15,7 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 
 	const refetchIntervalRef = useRef<NodeJS.Timeout>()
 	const lastQueryFnRef = useRef<typeof queryFn>()
+	const stableQueryFn = useCallback(queryFn, [])
 
 	const executeQuery = useCallback(async (): Promise<void> => {
 		if (!enabled || !isReady) return
@@ -23,7 +24,7 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 		setError(undefined)
 
 		try {
-			const result = await Promise.resolve(queryFn())
+			const result = await Promise.resolve(stableQueryFn())
 			setData(result as InferReturn<T>)
 			onSuccess?.(result)
 		} catch (err) {
@@ -33,7 +34,7 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 		} finally {
 			setIsLoading(false)
 		}
-	}, [enabled, isReady, queryFn, onSuccess, onError])
+	}, [enabled, isReady, stableQueryFn, onSuccess, onError])
 
 	const refetch = useCallback((): void => {
 		executeQuery()
@@ -47,11 +48,11 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 	}, [queryKey, refetch])
 
 	useEffect(() => {
-		if (lastQueryFnRef.current !== queryFn) {
-			lastQueryFnRef.current = queryFn
+		if (lastQueryFnRef.current !== stableQueryFn) {
+			lastQueryFnRef.current = stableQueryFn
 			executeQuery()
 		}
-	}, [queryFn, executeQuery])
+	}, [stableQueryFn, executeQuery])
 
 	useEffect(() => {
 		if (refetchInterval && enabled && isReady) {

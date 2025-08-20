@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.3.1
+
+### Patch Changes
+
+- bug fixes
+
 ## 0.3.0
 
 ### Minor Changes
