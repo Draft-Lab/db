@@ -7,70 +7,44 @@ type InferReturn<T> = T extends Promise<infer R> ? R : T
 
 export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferReturn<T>> => {
 	const { isReady, error: dbError } = useDatabaseContext()
-	const { queryKey, queryFn, enabled = true, refetchInterval, onError, onSuccess } = options
+	const { queryKey, queryFn, enabled = true } = options
 
 	const [data, setData] = useState<InferReturn<T> | undefined>(undefined)
 	const [error, setError] = useState<Error | undefined>(undefined)
 	const [isLoading, setIsLoading] = useState(false)
 
 	const queryFnRef = useRef(queryFn)
-	const hasInitializedRef = useRef(false)
-	const refetchIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined)
-
 	queryFnRef.current = queryFn
 
 	const executeQuery = useCallback(async (): Promise<void> => {
 		if (!enabled || !isReady) return
 
-		setIsLoading(true)
-		setError(undefined)
-
 		try {
+			setIsLoading(true)
+			setError(undefined)
 			const result = await Promise.resolve(queryFnRef.current())
 			setData(result as InferReturn<T>)
-			onSuccess?.(result)
 		} catch (err) {
 			const errorObj = err instanceof Error ? err : new Error(String(err))
 			setError(errorObj)
-			onError?.(errorObj)
 		} finally {
 			setIsLoading(false)
 		}
-	}, [enabled, isReady, onSuccess, onError])
+	}, [enabled, isReady])
 
-	const refetch = useCallback((): void => {
+	useEffect(() => {
 		executeQuery()
 	}, [executeQuery])
 
 	useEffect(() => {
 		if (!queryKey) return
-		return queryClient.subscribe(queryKey, refetch)
-	}, [queryKey, refetch])
-
-	useEffect(() => {
-		if (!hasInitializedRef.current && enabled && isReady) {
-			hasInitializedRef.current = true
-			executeQuery()
-		}
-	}, [enabled, isReady, executeQuery])
-
-	useEffect(() => {
-		if (!refetchInterval || !enabled || !isReady) return
-
-		refetchIntervalRef.current = setInterval(executeQuery, refetchInterval)
-		return () => {
-			if (refetchIntervalRef.current) {
-				clearInterval(refetchIntervalRef.current)
-			}
-		}
-	}, [refetchInterval, enabled, isReady, executeQuery])
-
-	const finalError = error || dbError || undefined
+		return queryClient.subscribe(queryKey, executeQuery)
+	}, [queryKey, executeQuery])
 
 	return {
 		data,
-		error: finalError,
+		error: error || dbError,
 		isLoading: isLoading || (!isReady && enabled),
-		refetch
+		refetch: executeQuery
 	}
 }

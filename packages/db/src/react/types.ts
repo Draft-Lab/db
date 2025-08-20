@@ -25,5 +25,5 @@ export type UseQueryResult<T> = {
 
 export type DatabaseContextValue = {
 	isReady: boolean
-	error: Error | null
+	error: Error | undefined
 }

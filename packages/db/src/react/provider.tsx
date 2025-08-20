@@ -18,7 +18,7 @@ interface DatabaseProviderProps {
 
 export const DatabaseProvider = ({ client, children }: DatabaseProviderProps) => {
 	const [isReady, setIsReady] = useState(false)
-	const [error, setError] = useState<Error | null>(null)
+	const [error, setError] = useState<Error | undefined>(undefined)
 
 	useEffect(() => {
 		const initDatabase = async () => {
@@ -27,7 +27,7 @@ export const DatabaseProvider = ({ client, children }: DatabaseProviderProps) =>
 					await client.ready()
 				}
 				setIsReady(true)
-				setError(null)
+				setError(undefined)
 			} catch (err) {
 				setError(err instanceof Error ? err : new Error(String(err)))
 				setIsReady(false)
