@@ -37,9 +37,10 @@ export class CoreSQLite {
 
 		await this.initMemory()
 
-		await this.initWorker()
-
-		await this.bootSync()
+		if (typeof window !== "undefined") {
+			await this.initWorker()
+			await this.bootSync()
+		}
 
 		this.isInitialized = true
 	}
@@ -58,6 +59,11 @@ export class CoreSQLite {
 	}
 
 	private async initWorker(): Promise<void> {
+		if (typeof Worker === "undefined") {
+			console.warn("@draftlab/db: Workers not available - running in memory-only mode")
+			return
+		}
+
 		this.worker = new Worker(new URL("./opfs-worker", import.meta.url), {
 			type: "module"
 		})
@@ -178,7 +184,8 @@ export class CoreSQLite {
 
 	private async sendToWorker<T>(message: Omit<WorkerMessage, "id">): Promise<T> {
 		if (!this.worker) {
-			throw new Error("Worker not initialized")
+			console.warn("@draftlab/db: Worker operation skipped (running in memory-only mode)")
+			return {} as T
 		}
 
 		const id = (++this.messageId).toString()
@@ -304,6 +311,10 @@ export class CoreSQLite {
 	}
 
 	private async tryRecoverWorker(): Promise<void> {
+		if (typeof window === "undefined") {
+			return
+		}
+
 		try {
 			console.warn("Attempting to recover worker connection...")
 
@@ -378,7 +389,9 @@ export class CoreSQLite {
 	}
 
 	async destroy(): Promise<void> {
-		await this.flushSyncQueue()
+		if (this.worker) {
+			await this.flushSyncQueue()
+		}
 
 		if (this.memory) {
 			this.memory.close()

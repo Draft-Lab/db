@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.2.1
+
+### Patch Changes
+
+- add checks for environment execution
+
 ## 0.2.0
 
 ### Minor Changes
