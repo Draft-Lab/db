@@ -10,6 +10,7 @@
 - 📂 **Persisted** - Automatic write-through caching to Origin Private File System
 - 🔒 **Type Safe** - Full TypeScript support with generic interfaces
 - 🛠️ **Drizzle Ready** - Drop-in compatibility with Drizzle ORM
+- 🔧 **Kysely Ready** - Native support for Kysely query builder
 - 🏗️ **Simple API** - Clean, developer-friendly interface
 
 ## Installation
@@ -80,13 +81,12 @@ console.log(user) // { id: 1, name: 'John Doe', email: 'john@example.com' }
 ## Architecture
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Client    │────│ CoreSQLite  │────│ OPFS Worker │
-└─────────────┘    └─────────────┘    └─────────────┘
-                          │
-                   ┌─────────────┐
-                   │ Memory DB   │ (< 1ms queries)
-                   └─────────────┘
+    Client
+       │
+   CoreSQLite ──── OPFS Worker
+       │              │
+   Memory DB      Persistent
+  (< 1ms read)     Storage
 ```
 
 The library uses a **dual-engine architecture**:
@@ -154,69 +154,77 @@ console.log({
 
 For advanced type-safe queries, use with [Drizzle ORM](https://orm.drizzle.team/):
 
-### Setup
-
 ```typescript
 import { CoreSQLiteDrizzle } from '@draftlab/db'
 import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core'
 
+// Setup
 const client = new CoreSQLiteDrizzle('database.sqlite')
 const db = drizzle(client.driver, client.batchDriver)
 
 await client.ready()
-```
 
-### Define Schema
-
-```typescript
+// Define schema
 const users = sqliteTable('users', {
   id: integer().primaryKey({ autoIncrement: true }),
   name: text().notNull(),
-  email: text().unique(),
-  createdAt: text().default(sql`(datetime('now'))`)
+  email: text().unique()
 })
-```
-
-### CRUD Operations
-
-```typescript
-import { eq, gt, count } from 'drizzle-orm'
 
 // Create table
-await client.driver(`
+client.run(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    email TEXT UNIQUE,
-    created_at TEXT DEFAULT (datetime('now'))
+    email TEXT UNIQUE
   )
-`, [], 'run')
+`)
 
-// Insert
-await db.insert(users).values({
-  name: 'John Doe',
-  email: 'john@example.com'
-})
-
-// Select  
+// Use Drizzle ORM
+await db.insert(users).values({ name: 'John Doe', email: 'john@example.com' })
 const allUsers = await db.select().from(users)
-const activeUsers = await db.select().from(users).where(gt(users.id, 0))
-
-// Update
-await db.update(users)
-  .set({ name: 'Jane Doe' })
-  .where(eq(users.id, 1))
-
-// Delete
-await db.delete(users).where(eq(users.id, 1))
-
-// Joins & Aggregations
-const userStats = await db
-  .select({ count: count() })
-  .from(users)
-  .where(gt(users.id, 0))
 ```
+
+> 📖 **Learn more**: Visit [Drizzle ORM Documentation](https://orm.drizzle.team/) for advanced queries, relations, migrations, and more.
+
+## Kysely Query Builder Integration
+
+For developers who prefer [Kysely](https://kysely.dev/), we provide native support:
+
+```typescript
+import { CoreSQLiteKysely } from '@draftlab/db'
+import { Kysely } from 'kysely'
+
+interface Database {
+  users: {
+    id: number
+    name: string
+    email: string
+  }
+}
+
+// Setup
+const client = new CoreSQLiteKysely('database.sqlite')
+const db = new Kysely<Database>({ dialect: client.dialect })
+
+await client.ready()
+
+// Create table
+client.run(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE
+  )
+`)
+
+// Use Kysely
+await db.insertInto('users').values({ name: 'John Doe', email: 'john@example.com' }).execute()
+const allUsers = await db.selectFrom('users').selectAll().execute()
+```
+
+> 📖 **Learn more**: Visit [Kysely Documentation](https://kysely.dev/) for advanced queries, transactions, migrations, and more.
 
 ## Performance
 
@@ -252,54 +260,10 @@ users.forEach(user => {
 
 ## Limitations
 
-1. **Drizzle Transactions**: Cannot isolate from external queries
+1. **Query Builder Transactions**: Cannot isolate from external queries (both Drizzle and Kysely)
 2. **OPFS Only**: No fallback to other storage methods
 3. **Worker Recovery**: Automatic reconnection on failures
 4. **Sync Delays**: Write operations may have persistence delays
-
-## Complete Example
-
-```typescript
-import { CoreSQLiteDrizzle } from '@draftlab/db'
-import { drizzle } from 'drizzle-orm/sqlite-proxy'
-import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core'
-
-// Setup
-const client = new CoreSQLiteDrizzle('todo-app.sqlite')
-const db = drizzle(client.driver, client.batchDriver)
-
-// Schema
-const todos = sqliteTable('todos', {
-  id: integer().primaryKey({ autoIncrement: true }),
-  title: text().notNull(),
-  completed: integer().default(0),
-  createdAt: text().default(sql`(datetime('now'))`)
-})
-
-// Wait for initialization
-await client.ready()
-
-// Create table
-await client.driver(`
-  CREATE TABLE IF NOT EXISTS todos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    completed INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
-  )
-`, [], 'run')
-
-// Use with Drizzle
-await db.insert(todos).values({ title: 'Learn @draftlab/db' })
-await db.insert(todos).values({ title: 'Build awesome app' })
-
-const allTodos = await db.select().from(todos)
-console.log(allTodos)
-// [
-//   { id: 1, title: 'Learn @draftlab/db', completed: 0, createdAt: '2024-01-01 12:00:00' },
-//   { id: 2, title: 'Build awesome app', completed: 0, createdAt: '2024-01-01 12:00:01' }
-// ]
-```
 
 ## License
 
