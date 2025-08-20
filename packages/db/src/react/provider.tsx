@@ -1,5 +1,6 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react"
 import type { DatabaseClient, DatabaseContextValue } from "./types"
+import { useIsClient } from "./use-is-client"
 
 const DatabaseContext = createContext<DatabaseContextValue | null>(null)
 
@@ -19,8 +20,11 @@ interface DatabaseProviderProps {
 export const DatabaseProvider = ({ client, children }: DatabaseProviderProps) => {
 	const [isReady, setIsReady] = useState(false)
 	const [error, setError] = useState<Error | undefined>(undefined)
+	const isClient = useIsClient()
 
 	useEffect(() => {
+		if (!isClient) return
+
 		const initDatabase = async () => {
 			try {
 				if ("ready" in client && typeof client.ready === "function") {
@@ -35,7 +39,7 @@ export const DatabaseProvider = ({ client, children }: DatabaseProviderProps) =>
 		}
 
 		initDatabase()
-	}, [client])
+	}, [client, isClient])
 
 	const contextValue: DatabaseContextValue = {
 		isReady,

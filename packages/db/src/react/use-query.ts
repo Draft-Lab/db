@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useDatabaseContext } from "./provider"
 import { queryClient } from "./query-client"
 import type { UseQueryOptions, UseQueryResult } from "./types"
+import { useIsClient } from "./use-is-client"
 
 type InferReturn<T> = T extends Promise<infer R> ? R : T
 
 export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferReturn<T>> => {
 	const { isReady, error: dbError } = useDatabaseContext()
 	const { queryKey, queryFn, enabled = true } = options
+	const isClient = useIsClient()
 
 	const [data, setData] = useState<InferReturn<T> | undefined>(undefined)
 	const [error, setError] = useState<Error | undefined>(undefined)
@@ -17,7 +19,7 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 	queryFnRef.current = queryFn
 
 	const executeQuery = useCallback(async (): Promise<void> => {
-		if (!enabled || !isReady) return
+		if (!enabled || !isReady || !isClient) return
 
 		try {
 			setIsLoading(true)
@@ -30,7 +32,7 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 		} finally {
 			setIsLoading(false)
 		}
-	}, [enabled, isReady])
+	}, [enabled, isReady, isClient])
 
 	useEffect(() => {
 		executeQuery()
@@ -43,8 +45,8 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 
 	return {
 		data,
+		refetch: executeQuery,
 		error: error || dbError,
-		isLoading: isLoading || (!isReady && enabled),
-		refetch: executeQuery
+		isLoading: isLoading || (!isReady && enabled && isClient)
 	}
 }

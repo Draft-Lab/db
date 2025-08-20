@@ -1,5 +1,6 @@
 export { invalidateAllQueries, invalidateQueries } from "./invalidate"
 export { DatabaseProvider } from "./provider"
 export type * from "./types"
+export { useIsClient } from "./use-is-client"
 export { useMutation } from "./use-mutation"
 export { useQuery } from "./use-query"
