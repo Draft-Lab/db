@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react"
 import { store } from "./store"
-import type { QueryKey } from "./types"
 
 export type MutationFunction<T, V> = (variables: V) => T | Promise<T>
 
@@ -8,7 +7,6 @@ export type UseMutationOptions<T, V> = {
 	mutationFn: MutationFunction<T, V>
 	onSuccess?: (data: T, variables: V) => void
 	onError?: (error: Error, variables: V) => void
-	invalidates?: QueryKey[]
 }
 
 export type UseMutationResult<T, V> = {
@@ -23,7 +21,7 @@ export type UseMutationResult<T, V> = {
 export const useMutation = <T, V = void>(
 	options: UseMutationOptions<T, V>
 ): UseMutationResult<T, V> => {
-	const { mutationFn, onSuccess, onError, invalidates = [] } = options
+	const { mutationFn, onSuccess, onError } = options
 
 	const [isLoading, setIsLoading] = useState(false)
 	const [error, setError] = useState<Error | undefined>(undefined)
@@ -38,9 +36,7 @@ export const useMutation = <T, V = void>(
 				const result = await Promise.resolve(mutationFn(variables))
 				setData(result)
 
-				invalidates.forEach((key) => {
-					store.invalidate(key)
-				})
+				store.invalidateAll()
 
 				onSuccess?.(result, variables)
 				return result
@@ -53,7 +49,7 @@ export const useMutation = <T, V = void>(
 				setIsLoading(false)
 			}
 		},
-		[mutationFn, invalidates, onSuccess, onError]
+		[mutationFn, onSuccess, onError]
 	)
 
 	const mutate = useCallback(

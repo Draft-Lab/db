@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.6.0
+
+### Minor Changes
+
+- improve store and remove invalidations
+
 ## 0.5.0
 
 ### Minor Changes

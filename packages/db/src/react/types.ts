@@ -4,11 +4,9 @@ import type { CoreSQLiteKysely } from "../kysely-client"
 
 export type DatabaseClient = Client | CoreSQLiteDrizzle | CoreSQLiteKysely
 
-export type QueryKey = string | readonly unknown[]
 export type QueryFunction<T> = () => T | Promise<T>
 
 export type UseQueryOptions<T> = {
-	queryKey?: QueryKey
 	queryFn: QueryFunction<T>
 	enabled?: boolean
 	onError?: (error: Error) => void
