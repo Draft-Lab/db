@@ -11,7 +11,6 @@ export type UseQueryOptions<T> = {
 	queryKey?: QueryKey
 	queryFn: QueryFunction<T>
 	enabled?: boolean
-	refetchInterval?: number
 	onError?: (error: Error) => void
 	onSuccess?: (data: T) => void
 }
@@ -20,7 +19,6 @@ export type UseQueryResult<T> = {
 	data: T | undefined
 	error: Error | undefined
 	isLoading: boolean
-	refetch: () => void
 }
 
 export type DatabaseContextValue = {

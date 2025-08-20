@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useDatabaseContext } from "./provider"
-import { queryClient } from "./query-client"
+import { store, useStore } from "./store"
 import type { UseQueryOptions, UseQueryResult } from "./types"
 import { useIsClient } from "./use-is-client"
 
@@ -11,49 +11,70 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 	const { queryKey, queryFn, enabled = true } = options
 	const isClient = useIsClient()
 
-	const [data, setData] = useState<InferReturn<T> | undefined>(undefined)
-	const [error, setError] = useState<Error | undefined>(undefined)
+	const data = useStore<InferReturn<T>>(queryKey)
+
 	const [isLoading, setIsLoading] = useState(false)
+	const [error, setError] = useState<Error | undefined>(undefined)
 
 	const queryFnRef = useRef(queryFn)
-	const hasExecutedRef = useRef(false)
+	const isExecutingRef = useRef(false)
+	const hasFetchedRef = useRef(false)
 
 	queryFnRef.current = queryFn
 
 	const executeQuery = useCallback(async (): Promise<void> => {
-		if (!enabled || !isReady || !isClient) return
+		if (!enabled || !isReady || !isClient || isExecutingRef.current) {
+			return
+		}
+
+		if (data !== undefined && hasFetchedRef.current) {
+			return
+		}
+
+		isExecutingRef.current = true
 
 		try {
 			setIsLoading(true)
 			setError(undefined)
+
 			const result = await Promise.resolve(queryFnRef.current())
-			setData(result as InferReturn<T>)
+
+			if (queryKey) {
+				store.setData(queryKey, result)
+			}
+
+			hasFetchedRef.current = true
+
+			options.onSuccess?.(result)
 		} catch (err) {
 			const errorObj = err instanceof Error ? err : new Error(String(err))
 			setError(errorObj)
+
+			options.onError?.(errorObj)
 		} finally {
 			setIsLoading(false)
+			isExecutingRef.current = false
+		}
+	}, [enabled, isReady, isClient, queryKey, data, options])
+
+	useEffect(() => {
+		if (enabled && isReady && isClient && !hasFetchedRef.current) {
+			executeQuery()
 		}
 	}, [enabled, isReady, isClient])
 
 	useEffect(() => {
-		if (!hasExecutedRef.current && enabled && isReady && isClient) {
-			hasExecutedRef.current = true
+		if (!queryKey || !enabled) return
+
+		if (data === undefined && hasFetchedRef.current) {
+			hasFetchedRef.current = false
 			executeQuery()
 		}
-
-		if (!queryKey) return
-		return queryClient.subscribe(queryKey, () => {
-			if (enabled && isReady && isClient) {
-				executeQuery()
-			}
-		})
-	}, [queryKey, enabled, isReady, isClient, executeQuery])
+	}, [data, queryKey, enabled, executeQuery])
 
 	return {
 		data,
-		refetch: executeQuery,
 		error: error || dbError,
-		isLoading: isLoading || (!isReady && enabled && isClient)
+		isLoading: isLoading || (!isReady && enabled && isClient && !data)
 	}
 }

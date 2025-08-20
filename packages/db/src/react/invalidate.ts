@@ -1,10 +1,10 @@
-import { queryClient } from "./query-client"
+import { store } from "./store"
 import type { QueryKey } from "./types"
 
 export const invalidateQueries = (queryKey: QueryKey) => {
-	queryClient.invalidateQueries(queryKey)
+	store.invalidate(queryKey)
 }
 
 export const invalidateAllQueries = () => {
-	queryClient.invalidateAll()
+	store.invalidateAll()
 }

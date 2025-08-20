@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { invalidateQueries } from "./invalidate"
+import { store } from "./store"
 import type { QueryKey } from "./types"
 
 export type MutationFunction<T, V> = (variables: V) => T | Promise<T>
@@ -17,6 +17,7 @@ export type UseMutationResult<T, V> = {
 	isLoading: boolean
 	error: Error | undefined
 	data: T | undefined
+	reset: () => void
 }
 
 export const useMutation = <T, V = void>(
@@ -37,9 +38,9 @@ export const useMutation = <T, V = void>(
 				const result = await Promise.resolve(mutationFn(variables))
 				setData(result)
 
-				for (const queryKey of invalidates) {
-					invalidateQueries(queryKey)
-				}
+				invalidates.forEach((key) => {
+					store.invalidate(key)
+				})
 
 				onSuccess?.(result, variables)
 				return result
@@ -69,11 +70,18 @@ export const useMutation = <T, V = void>(
 		[executeMutation]
 	)
 
+	const reset = useCallback(() => {
+		setData(undefined)
+		setError(undefined)
+		setIsLoading(false)
+	}, [])
+
 	return {
 		mutate,
 		mutateAsync,
 		isLoading,
 		error,
-		data
+		data,
+		reset
 	}
 }
