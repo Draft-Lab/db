@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.3.0
+
+### Minor Changes
+
+- add react hooks
+
 ## 0.2.1
 
 ### Patch Changes

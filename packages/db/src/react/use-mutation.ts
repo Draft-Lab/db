@@ -1,0 +1,79 @@
+import { useCallback, useState } from "react"
+import { invalidateQueries } from "./invalidate"
+import type { QueryKey } from "./types"
+
+export type MutationFunction<T, V> = (variables: V) => T | Promise<T>
+
+export type UseMutationOptions<T, V> = {
+	mutationFn: MutationFunction<T, V>
+	onSuccess?: (data: T, variables: V) => void
+	onError?: (error: Error, variables: V) => void
+	invalidates?: QueryKey[]
+}
+
+export type UseMutationResult<T, V> = {
+	mutate: (variables: V) => void
+	mutateAsync: (variables: V) => Promise<T>
+	isLoading: boolean
+	error: Error | undefined
+	data: T | undefined
+}
+
+export const useMutation = <T, V = void>(
+	options: UseMutationOptions<T, V>
+): UseMutationResult<T, V> => {
+	const { mutationFn, onSuccess, onError, invalidates = [] } = options
+
+	const [isLoading, setIsLoading] = useState(false)
+	const [error, setError] = useState<Error | undefined>(undefined)
+	const [data, setData] = useState<T | undefined>(undefined)
+
+	const executeMutation = useCallback(
+		async (variables: V): Promise<T> => {
+			setIsLoading(true)
+			setError(undefined)
+
+			try {
+				const result = await Promise.resolve(mutationFn(variables))
+				setData(result)
+
+				for (const queryKey of invalidates) {
+					invalidateQueries(queryKey)
+				}
+
+				onSuccess?.(result, variables)
+				return result
+			} catch (err) {
+				const errorObj = err instanceof Error ? err : new Error(String(err))
+				setError(errorObj)
+				onError?.(errorObj, variables)
+				throw errorObj
+			} finally {
+				setIsLoading(false)
+			}
+		},
+		[mutationFn, invalidates, onSuccess, onError]
+	)
+
+	const mutate = useCallback(
+		(variables: V) => {
+			executeMutation(variables).catch(() => {})
+		},
+		[executeMutation]
+	)
+
+	const mutateAsync = useCallback(
+		(variables: V) => {
+			return executeMutation(variables)
+		},
+		[executeMutation]
+	)
+
+	return {
+		mutate,
+		mutateAsync,
+		isLoading,
+		error,
+		data
+	}
+}
