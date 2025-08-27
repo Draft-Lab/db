@@ -32,7 +32,7 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 
 			const result = await Promise.resolve(queryFnRef.current())
 
-			setData(result)
+			setData(result as InferReturn<T>)
 			onSuccess?.(result)
 		} catch (err) {
 			const errorObj = err instanceof Error ? err : new Error(String(err))
