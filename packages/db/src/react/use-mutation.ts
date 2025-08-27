@@ -1,5 +1,4 @@
 import { useCallback, useState } from "react"
-import { store } from "./store"
 
 export type MutationFunction<T, V> = (variables: V) => T | Promise<T>
 
@@ -35,8 +34,6 @@ export const useMutation = <T, V = void>(
 			try {
 				const result = await Promise.resolve(mutationFn(variables))
 				setData(result)
-
-				store.invalidateAll()
 
 				onSuccess?.(result, variables)
 				return result

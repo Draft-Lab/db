@@ -17,6 +17,7 @@ export type UseQueryResult<T> = {
 	data: T | undefined
 	error: Error | undefined
 	isLoading: boolean
+	refetch: () => void
 }
 
 export type DatabaseContextValue = {

@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.7.1
+
+### Patch Changes
+
+- change logic for react hooks
+
 ## 0.7.0
 
 ### Minor Changes
