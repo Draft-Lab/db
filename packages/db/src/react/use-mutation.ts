@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react"
+import { useDatabaseContext } from "./provider"
 
 export type MutationFunction<T, V> = (variables: V) => T | Promise<T>
 
@@ -21,6 +22,7 @@ export const useMutation = <T, V = void>(
 	options: UseMutationOptions<T, V>
 ): UseMutationResult<T, V> => {
 	const { mutationFn, onSuccess, onError } = options
+	const { notifier } = useDatabaseContext()
 
 	const [isLoading, setIsLoading] = useState(false)
 	const [error, setError] = useState<Error | undefined>(undefined)
@@ -36,6 +38,9 @@ export const useMutation = <T, V = void>(
 				setData(result)
 
 				onSuccess?.(result, variables)
+
+				notifier.notify()
+
 				return result
 			} catch (err) {
 				const errorObj = err instanceof Error ? err : new Error(String(err))
@@ -46,7 +51,7 @@ export const useMutation = <T, V = void>(
 				setIsLoading(false)
 			}
 		},
-		[mutationFn, onSuccess, onError]
+		[mutationFn, onSuccess, onError, notifier]
 	)
 
 	const mutate = useCallback(

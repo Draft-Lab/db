@@ -6,7 +6,7 @@ import { useIsClient } from "./use-is-client"
 type InferReturn<T> = T extends Promise<infer R> ? R : T
 
 export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferReturn<T>> => {
-	const { isReady, error: dbError } = useDatabaseContext()
+	const { isReady, error: dbError, notifier } = useDatabaseContext()
 	const { queryFn, enabled = true, onError, onSuccess } = options
 	const isClient = useIsClient()
 
@@ -49,6 +49,16 @@ export const useQuery = <T>(options: UseQueryOptions<T>): UseQueryResult<InferRe
 			executeQuery()
 		}
 	}, [enabled, isReady, isClient, executeQuery])
+
+	useEffect(() => {
+		if (!enabled || !isClient) return
+
+		const unsubscribe = notifier.subscribe(executeQuery)
+
+		return () => {
+			unsubscribe()
+		}
+	}, [enabled, isClient, notifier, executeQuery])
 
 	const refetch = useCallback(() => {
 		executeQuery()

@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.7.2
+
+### Patch Changes
+
+- modify logic for hooks with events
+
 ## 0.7.1
 
 ### Patch Changes

@@ -1,4 +1,5 @@
-import { createContext, type ReactNode, useContext, useEffect, useState } from "react"
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react"
+import { QueryNotifier } from "./query-notifier"
 import type { DatabaseClient, DatabaseContextValue } from "./types"
 import { useIsClient } from "./use-is-client"
 
@@ -22,6 +23,8 @@ export const DatabaseProvider = ({ client, children }: DatabaseProviderProps) =>
 	const [error, setError] = useState<Error | undefined>(undefined)
 	const isClient = useIsClient()
 
+	const notifier = useMemo(() => new QueryNotifier(), [])
+
 	useEffect(() => {
 		if (!isClient) return
 
@@ -42,8 +45,9 @@ export const DatabaseProvider = ({ client, children }: DatabaseProviderProps) =>
 	}, [client, isClient])
 
 	const contextValue: DatabaseContextValue = {
+		error,
 		isReady,
-		error
+		notifier
 	}
 
 	return <DatabaseContext.Provider value={contextValue}>{children}</DatabaseContext.Provider>
