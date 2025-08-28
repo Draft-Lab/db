@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.7.4
+
+### Patch Changes
+
+- update packages
+
 ## 0.7.3
 
 ### Patch Changes
