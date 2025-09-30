@@ -101,6 +101,16 @@ export class Client {
 		}
 	}
 
+	async exportDatabase(): Promise<ArrayBuffer> {
+		this.ensureReady()
+		return await this.db.exportDatabase()
+	}
+
+	async importDatabase(data: ArrayBuffer): Promise<void> {
+		this.ensureReady()
+		await this.db.importDatabase(data)
+	}
+
 	async close(): Promise<void> {
 		await this.db.destroy()
 		this.isReady = false

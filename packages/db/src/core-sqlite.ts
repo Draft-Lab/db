@@ -388,6 +388,47 @@ export class CoreSQLite {
 		)
 	}
 
+	async exportDatabase(): Promise<ArrayBuffer> {
+		if (!this.worker) {
+			throw new Error("Export requires persistent storage (OPFS worker)")
+		}
+
+		await this.flushSyncQueue()
+
+		const result = await this.sendToWorker<{ name: string; data: ArrayBuffer }>({
+			type: "export",
+			payload: undefined
+		})
+
+		return result.data
+	}
+
+	async importDatabase(data: ArrayBuffer): Promise<void> {
+		if (!this.worker) {
+			throw new Error("Import requires persistent storage (OPFS worker)")
+		}
+
+		await this.flushSyncQueue()
+
+		await this.sendToWorker<void>({
+			type: "import",
+			payload: { data }
+		})
+
+		if (this.memory) {
+			this.memory.close()
+			this.memory = new (this.sqlite as SQLite).oo1.DB(":memory:")
+
+			this.memory.exec({ sql: "PRAGMA synchronous = OFF" })
+			this.memory.exec({ sql: "PRAGMA journal_mode = MEMORY" })
+			this.memory.exec({ sql: "PRAGMA temp_store = MEMORY" })
+			this.memory.exec({ sql: "PRAGMA locking_mode = EXCLUSIVE" })
+			this.memory.exec({ sql: "PRAGMA cache_size = -64000" })
+		}
+
+		await this.bootSync()
+	}
+
 	async destroy(): Promise<void> {
 		if (this.worker) {
 			await this.flushSyncQueue()
