@@ -29,13 +29,16 @@ Add to your `vite.config.ts`:
 
 ```typescript
 export default {
+  worker: {
+    format: "es"
+  },
   optimizeDeps: {
-    exclude: ['@draftlab/db']
+    exclude: ["@draftlab/db"]
   },
   server: {
     headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin'
+      "Cross-Origin-Embedder-Policy": "require-corp",
+      "Cross-Origin-Opener-Policy": "same-origin"
     }
   }
 }
@@ -46,7 +49,7 @@ export default {
 ## Quick Start
 
 ```typescript
-import { Client } from '@draftlab/db'
+import { Client } from "@draftlab/db"
 
 interface User {
   id: number
@@ -54,7 +57,7 @@ interface User {
   email: string
 }
 
-const db = new Client('my-app.sqlite')
+const db = new Client("database.sqlite")
 await db.ready()
 
 // Create table
@@ -67,15 +70,15 @@ db.run(`
 `)
 
 // Insert data
-db.run('INSERT INTO users (name, email) VALUES (?, ?)', ['John Doe', 'john@example.com'])
+db.run("INSERT INTO users (name, email) VALUES (?, ?)", ["John Doe", "john@example.com"])
 
 // Query data
-const users = db.query<User>('SELECT * FROM users')
-console.log(users) // [{ id: 1, name: 'John Doe', email: 'john@example.com' }]
+const users = db.query<User>("SELECT * FROM users")
+console.log(users) // [{ id: 1, name: "John Doe", email: "john@example.com" }]
 
 // Get single record
-const user = db.get<User>('SELECT * FROM users WHERE id = ?', [1])
-console.log(user) // { id: 1, name: 'John Doe', email: 'john@example.com' }
+const user = db.get<User>("SELECT * FROM users WHERE id = ?", [1])
+console.log(user) // { id: 1, name: "John Doe", email: "john@example.com" }
 ```
 
 ## Architecture
@@ -90,6 +93,7 @@ console.log(user) // { id: 1, name: 'John Doe', email: 'john@example.com' }
 ```
 
 The library uses a **dual-engine architecture**:
+
 - **Memory SQLite**: Handles all queries with ultra-low latency
 - **OPFS Worker**: Persists changes in background via Origin Private File System  
 - **Write-Through Cache**: Automatic synchronization without blocking your app
@@ -99,40 +103,45 @@ The library uses a **dual-engine architecture**:
 ### Client
 
 #### `query<T>(sql, params?): T[]`
+
 Execute SELECT queries returning array of typed objects.
 
 ```typescript
-const users = db.query<User>('SELECT * FROM users WHERE age > ?', [18])
+const users = db.query<User>("SELECT * FROM users WHERE age > ?", [18])
 ```
 
 #### `get<T>(sql, params?): T | undefined`
+
 Execute SELECT queries returning single typed object or undefined.
 
 ```typescript
-const user = db.get<User>('SELECT * FROM users WHERE id = ?', [1])
+const user = db.get<User>("SELECT * FROM users WHERE id = ?", [1])
 ```
 
 #### `run(sql, params?): void`
+
 Execute INSERT, UPDATE, DELETE queries without return value.
 
 ```typescript
-db.run('INSERT INTO users (name) VALUES (?)', ['Alice'])
-db.run('UPDATE users SET name = ? WHERE id = ?', ['Bob', 1])
-db.run('DELETE FROM users WHERE id = ?', [1])
+db.run("INSERT INTO users (name) VALUES (?)", ["Alice"])
+db.run("UPDATE users SET name = ? WHERE id = ?", ["Bob", 1])
+db.run("DELETE FROM users WHERE id = ?", [1])
 ```
 
 #### `transaction(callback): T`
+
 Execute multiple operations in a single transaction.
 
 ```typescript
 db.transaction((tx) => {
-  tx.run('INSERT INTO users (name) VALUES (?)', ['Alice'])
-  tx.run('INSERT INTO users (name) VALUES (?)', ['Bob'])  
-  tx.run('UPDATE users SET active = ? WHERE name = ?', [true, 'Alice'])
+  tx.run("INSERT INTO users (name) VALUES (?)", ["Alice"])
+  tx.run("INSERT INTO users (name) VALUES (?)", ["Bob"])
+  tx.run("UPDATE users SET active = ? WHERE name = ?", [true, "Alice"])
 })
 ```
 
 #### `ready(): Promise<void>`
+
 Wait for database initialization to complete.
 
 ```typescript
@@ -155,19 +164,19 @@ console.log({
 For advanced type-safe queries, use with [Drizzle ORM](https://orm.drizzle.team/):
 
 ```typescript
-import { CoreSQLiteDrizzle } from '@draftlab/db'
-import { drizzle } from 'drizzle-orm/sqlite-proxy'
-import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core'
+import { CoreSQLiteDrizzle } from "@draftlab/db"
+import { drizzle } from "drizzle-orm/sqlite-proxy"
+import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core"
 
 // Setup
-const client = new CoreSQLiteDrizzle('database.sqlite')
+const client = new CoreSQLiteDrizzle("database.sqlite")
 const db = drizzle(client.driver, client.batchDriver)
 
 await client.ready()
 
 // Define schema
-const users = sqliteTable('users', {
-  id: integer().primaryKey({ autoIncrement: true }),
+const users = sqliteTable("users", {
+  id: integer().primaryKey(),
   name: text().notNull(),
   email: text().unique()
 })
@@ -182,7 +191,7 @@ client.run(`
 `)
 
 // Use Drizzle ORM
-await db.insert(users).values({ name: 'John Doe', email: 'john@example.com' })
+await db.insert(users).values({ name: "John Doe", email: "john@example.com" })
 const allUsers = await db.select().from(users)
 ```
 
@@ -193,35 +202,36 @@ const allUsers = await db.select().from(users)
 For developers who prefer [Kysely](https://kysely.dev/), we provide native support:
 
 ```typescript
-import { CoreSQLiteKysely } from '@draftlab/db'
-import { Kysely } from 'kysely'
+import { CoreSQLiteKysely } from "@draftlab/db"
+import { type Generated, Kysely } from "kysely"
 
 interface Database {
   users: {
-    id: number
+    id: Generated<number>
     name: string
     email: string
   }
 }
 
 // Setup
-const client = new CoreSQLiteKysely('database.sqlite')
+const client = new CoreSQLiteKysely("database.sqlite")
 const db = new Kysely<Database>({ dialect: client.dialect })
 
 await client.ready()
 
 // Create table
-client.run(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE
-  )
-`)
+await db.schema
+  .createTable("users")
+  .ifNotExists()
+  .addColumn("id", "integer", (col) => col.autoIncrement().primaryKey())
+  .addColumn("name", "text")
+  .addColumn("email", "text")
+  .execute()
+
 
 // Use Kysely
-await db.insertInto('users').values({ name: 'John Doe', email: 'john@example.com' }).execute()
-const allUsers = await db.selectFrom('users').selectAll().execute()
+await db.insertInto("users").values({ name: "John Doe", email: "john@example.com" }).execute()
+const allUsers = await db.selectFrom("users").selectAll().execute()
 ```
 
 > 📖 **Learn more**: Visit [Kysely Documentation](https://kysely.dev/) for advanced queries, transactions, migrations, and more.
@@ -241,13 +251,13 @@ const allUsers = await db.selectFrom('users').selectAll().execute()
 // ✅ Use transactions for bulk operations
 db.transaction((tx) => {
   users.forEach(user => {
-    tx.run('INSERT INTO users (name) VALUES (?)', [user.name])
+    tx.run("INSERT INTO users (name) VALUES (?)", [user.name])
   })
 })
 
 // ❌ Avoid individual operations for bulk data
 users.forEach(user => {
-  db.run('INSERT INTO users (name) VALUES (?)', [user.name])
+  db.run("INSERT INTO users (name) VALUES (?)", [user.name])
 })
 ```
 

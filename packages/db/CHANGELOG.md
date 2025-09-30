@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.8.0
+
+### Minor Changes
+
+- remove react
+
 ## 0.7.5
 
 ### Patch Changes
