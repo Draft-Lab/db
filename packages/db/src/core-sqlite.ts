@@ -20,6 +20,7 @@ export class CoreSQLite {
 	private syncQueue: DriverStatement[] = []
 	private isInitialized = false
 	private isSyncing = false
+	private isImporting = false
 	private messageId = 0
 	private pendingMessages = new Map<
 		string,
@@ -258,7 +259,7 @@ export class CoreSQLite {
 	}
 
 	private async flushSyncQueue(): Promise<void> {
-		if (this.isSyncing || this.syncQueue.length === 0 || !this.worker) {
+		if (this.isSyncing || this.isImporting || this.syncQueue.length === 0 || !this.worker) {
 			return
 		}
 
@@ -393,14 +394,20 @@ export class CoreSQLite {
 			throw new Error("Export requires persistent storage (OPFS worker)")
 		}
 
-		await this.flushSyncQueue()
+		this.isImporting = true
 
-		const result = await this.sendToWorker<{ name: string; data: ArrayBuffer }>({
-			type: "export",
-			payload: undefined
-		})
+		try {
+			await this.flushSyncQueue()
 
-		return result.data
+			const result = await this.sendToWorker<{ name: string; data: ArrayBuffer }>({
+				type: "export",
+				payload: undefined
+			})
+
+			return result.data
+		} finally {
+			this.isImporting = false
+		}
 	}
 
 	async importDatabase(data: ArrayBuffer): Promise<void> {
@@ -408,25 +415,31 @@ export class CoreSQLite {
 			throw new Error("Import requires persistent storage (OPFS worker)")
 		}
 
-		await this.flushSyncQueue()
+		this.isImporting = true
 
-		await this.sendToWorker<void>({
-			type: "import",
-			payload: { data }
-		})
+		try {
+			await this.flushSyncQueue()
 
-		if (this.memory) {
-			this.memory.close()
-			this.memory = new (this.sqlite as SQLite).oo1.DB(":memory:")
+			await this.sendToWorker<void>({
+				type: "import",
+				payload: { data }
+			})
 
-			this.memory.exec({ sql: "PRAGMA synchronous = OFF" })
-			this.memory.exec({ sql: "PRAGMA journal_mode = MEMORY" })
-			this.memory.exec({ sql: "PRAGMA temp_store = MEMORY" })
-			this.memory.exec({ sql: "PRAGMA locking_mode = EXCLUSIVE" })
-			this.memory.exec({ sql: "PRAGMA cache_size = -64000" })
+			if (this.memory) {
+				this.memory.close()
+				this.memory = new (this.sqlite as SQLite).oo1.DB(":memory:")
+
+				this.memory.exec({ sql: "PRAGMA synchronous = OFF" })
+				this.memory.exec({ sql: "PRAGMA journal_mode = MEMORY" })
+				this.memory.exec({ sql: "PRAGMA temp_store = MEMORY" })
+				this.memory.exec({ sql: "PRAGMA locking_mode = EXCLUSIVE" })
+				this.memory.exec({ sql: "PRAGMA cache_size = -64000" })
+			}
+
+			await this.bootSync()
+		} finally {
+			this.isImporting = false
 		}
-
-		await this.bootSync()
 	}
 
 	async destroy(): Promise<void> {

@@ -160,18 +160,60 @@ const handleImport = async (payload: ImportPayload): Promise<void> => {
 		throw new Error("Worker database not initialized")
 	}
 
+	const databasePath = db.filename
 	db.close()
 
-	const dataPointer = sqlite.wasm.allocFromTypedArray(new Uint8Array(payload.data))
-	const resultCode = sqlite.capi.sqlite3_deserialize(
-		db,
+	const tempDb = new sqlite.oo1.DB(":memory:")
+	const dataArray = new Uint8Array(payload.data)
+
+	const dbPointer = tempDb.pointer
+	if (!dbPointer) {
+		tempDb.close()
+		throw new Error("Failed to get database pointer")
+	}
+
+	const pData = sqlite.wasm.alloc(dataArray.byteLength)
+	if (!pData) {
+		tempDb.close()
+		throw new Error("Failed to allocate memory")
+	}
+
+	sqlite.wasm.heap8u().set(dataArray, pData)
+
+	const rc = sqlite.capi.sqlite3_deserialize(
+		dbPointer,
 		"main",
-		dataPointer,
-		payload.data.byteLength,
-		payload.data.byteLength,
-		sqlite.capi.SQLITE_DESERIALIZE_RESIZEABLE
+		pData,
+		dataArray.byteLength,
+		dataArray.byteLength,
+		sqlite.capi.SQLITE_DESERIALIZE_FREEONCLOSE | sqlite.capi.SQLITE_DESERIALIZE_RESIZEABLE
 	)
-	db.checkRc(resultCode)
+
+	if (rc !== sqlite.capi.SQLITE_OK) {
+		tempDb.close()
+		throw new Error(`Failed to deserialize: ${sqlite.capi.sqlite3_errstr(rc)}`)
+	}
+
+	tempDb.exec({
+		sql: `VACUUM main INTO '${databasePath}'`
+	})
+
+	tempDb.close()
+
+	try {
+		db = new sqlite.oo1.DB(databasePath, "cw", "opfs-sahpool")
+	} catch {
+		try {
+			db = new sqlite.oo1.OpfsDb(databasePath, "cw")
+		} catch {
+			db = new sqlite.oo1.DB(databasePath, "cw", "opfs")
+		}
+	}
+
+	db.exec({ sql: "PRAGMA journal_mode = WAL" })
+	db.exec({ sql: "PRAGMA synchronous = NORMAL" })
+	db.exec({ sql: "PRAGMA cache_size = 5000" })
+	db.exec({ sql: "PRAGMA foreign_keys = ON" })
 }
 
 const handleDestroy = async (): Promise<void> => {

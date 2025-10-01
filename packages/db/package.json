@@ -1,6 +1,6 @@
 {
 	"name": "@draftlab/db",
-	"version": "0.9.0",
+	"version": "0.9.1",
 	"type": "module",
 	"description": "Core implementation for @draftlab/db",
 	"author": "Matheus Pergoli",
@@ -40,7 +40,7 @@
 	},
 	"devDependencies": {
 		"@draftlab/tsconfig": "workspace:*",
-		"@types/node": "^24.6.0",
+		"@types/node": "^24.6.1",
 		"drizzle-orm": "^0.44.5",
 		"kysely": "^0.28.7",
 		"tsdown": "^0.15.6",
