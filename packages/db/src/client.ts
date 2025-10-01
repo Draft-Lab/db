@@ -3,82 +3,62 @@ import type { SQLValue } from "./types"
 
 export class Client {
 	private db: CoreSQLite
-	private isReady = false
 
 	constructor(databasePath: string) {
 		this.db = new CoreSQLite()
-		this.init(databasePath)
+		this.db.setConfig({ databasePath })
 	}
 
-	private async init(databasePath: string): Promise<void> {
-		try {
-			await this.db.init({ databasePath })
-			this.isReady = true
-		} catch (error) {
-			console.error("Client initialization failed:", error)
-			throw error
-		}
-	}
-
-	async ready(): Promise<void> {
-		while (!this.isReady) {
-			await new Promise((resolve) => setTimeout(resolve, 50))
-		}
-	}
-
-	sql<T = Record<string, SQLValue>>(
+	async sql<T = Record<string, SQLValue>>(
 		queryTemplate: TemplateStringsArray | string,
 		...params: SQLValue[]
-	): T[] {
-		this.ensureReady()
-
+	): Promise<T[]> {
 		const sql = this.buildQuery(queryTemplate, params)
-		const result = this.db.exec({ sql, params: [], method: "all" })
+		const result = await this.db.exec({ sql, params: [], method: "all" })
 
 		return this.convertToObjects<T>(result)
 	}
 
-	query<T = Record<string, SQLValue>>(sql: string, params: SQLValue[] = []): T[] {
-		this.ensureReady()
-
-		const result = this.db.exec({ sql, params, method: "all" })
+	async query<T = Record<string, SQLValue>>(
+		sql: string,
+		params: SQLValue[] = []
+	): Promise<T[]> {
+		const result = await this.db.exec({ sql, params, method: "all" })
 		return this.convertToObjects<T>(result)
 	}
 
-	get<T = Record<string, SQLValue>>(sql: string, params: SQLValue[] = []): T | undefined {
-		this.ensureReady()
-
-		const result = this.db.exec({ sql, params, method: "get" })
+	async get<T = Record<string, SQLValue>>(
+		sql: string,
+		params: SQLValue[] = []
+	): Promise<T | undefined> {
+		const result = await this.db.exec({ sql, params, method: "get" })
 		const objects = this.convertToObjects<T>(result)
 		return objects[0]
 	}
 
-	run(sql: string, params: SQLValue[] = []): void {
-		this.ensureReady()
-		this.db.exec({ sql, params, method: "run" })
+	async run(sql: string, params: SQLValue[] = []): Promise<void> {
+		await this.db.exec({ sql, params, method: "run" })
 	}
 
-	transaction<T>(callback: (tx: TransactionInterface) => T): T {
-		this.ensureReady()
-
+	async batch<T>(callback: (tx: BatchInterface) => T | Promise<T>): Promise<T> {
 		const statements: Array<{ sql: string; params: SQLValue[] }> = []
 
-		const tx: TransactionInterface = {
-			sql: (queryTemplate, ...params) => {
+		const tx: BatchInterface = {
+			sql: async (queryTemplate, ...params) => {
 				const sql = this.buildQuery(queryTemplate, params)
 				statements.push({ sql, params: [] })
 				return []
 			},
-			query: (sql, params = []) => {
+			query: async (sql, params = []) => {
 				statements.push({ sql, params })
 				return []
 			},
-			run: (sql, params = []) => {
+			run: async (sql, params = []) => {
 				statements.push({ sql, params })
 			}
 		}
 
-		const result = callback(tx)
+		const result = await callback(tx)
 
 		if (statements.length > 0) {
 			const driverStatements = statements.map((stmt) => ({
@@ -87,7 +67,40 @@ export class Client {
 				method: "run" as const
 			}))
 
-			this.db.execBatch(driverStatements)
+			await this.db.execBatch(driverStatements)
+		}
+
+		return result
+	}
+
+	async transaction<T>(callback: (tx: TransactionInterface) => T | Promise<T>): Promise<T> {
+		const statements: Array<{ sql: string; params: SQLValue[] }> = []
+
+		const tx: TransactionInterface = {
+			sql: async (queryTemplate, ...params) => {
+				const sql = this.buildQuery(queryTemplate, params)
+				statements.push({ sql, params: [] })
+				return []
+			},
+			query: async (sql, params = []) => {
+				statements.push({ sql, params })
+				return []
+			},
+			run: async (sql, params = []) => {
+				statements.push({ sql, params })
+			}
+		}
+
+		const result = await callback(tx)
+
+		if (statements.length > 0) {
+			const driverStatements = statements.map((stmt) => ({
+				sql: stmt.sql,
+				params: stmt.params,
+				method: "run" as const
+			}))
+
+			await this.db.transaction(driverStatements)
 		}
 
 		return result
@@ -96,30 +109,20 @@ export class Client {
 	get status() {
 		return {
 			ready: this.db.isReady,
-			persistent: this.db.hasPersistentStorage,
-			pendingSync: this.db.pendingSyncCount
+			persistent: this.db.hasPersistentStorage
 		}
 	}
 
 	async exportDatabase(): Promise<ArrayBuffer> {
-		this.ensureReady()
 		return await this.db.exportDatabase()
 	}
 
 	async importDatabase(data: ArrayBuffer): Promise<void> {
-		this.ensureReady()
 		await this.db.importDatabase(data)
 	}
 
 	async close(): Promise<void> {
 		await this.db.destroy()
-		this.isReady = false
-	}
-
-	private ensureReady(): void {
-		if (!this.isReady) {
-			throw new Error("Database not ready. Wait for initialization to complete.")
-		}
 	}
 
 	private buildQuery(
@@ -165,11 +168,20 @@ export class Client {
 	}
 }
 
+interface BatchInterface {
+	sql<T = Record<string, SQLValue>>(
+		queryTemplate: TemplateStringsArray | string,
+		...params: SQLValue[]
+	): Promise<T[]>
+	query<T = Record<string, SQLValue>>(sql: string, params?: SQLValue[]): Promise<T[]>
+	run(sql: string, params?: SQLValue[]): Promise<void>
+}
+
 interface TransactionInterface {
 	sql<T = Record<string, SQLValue>>(
 		queryTemplate: TemplateStringsArray | string,
 		...params: SQLValue[]
-	): T[]
-	query<T = Record<string, SQLValue>>(sql: string, params?: SQLValue[]): T[]
-	run(sql: string, params?: SQLValue[]): void
+	): Promise<T[]>
+	query<T = Record<string, SQLValue>>(sql: string, params?: SQLValue[]): Promise<T[]>
+	run(sql: string, params?: SQLValue[]): Promise<void>
 }

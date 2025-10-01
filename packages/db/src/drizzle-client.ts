@@ -2,22 +2,14 @@ import { CoreSQLite } from "./core-sqlite"
 import type { DriverStatement, SQLValue } from "./types"
 
 export class CoreSQLiteDrizzle extends CoreSQLite {
-	private initPromise?: Promise<void>
-
 	constructor(databasePath?: string) {
 		super()
 
 		if (databasePath) {
-			this.initPromise = this.init({
+			this.config = {
 				databasePath,
 				verbose: false
-			}).catch(console.error)
-		}
-	}
-
-	async ready(): Promise<void> {
-		if (this.initPromise) {
-			await this.initPromise
+			}
 		}
 	}
 
@@ -26,10 +18,6 @@ export class CoreSQLiteDrizzle extends CoreSQLite {
 		params?: SQLValue[],
 		method: "get" | "all" | "run" | "values" = "all"
 	) => {
-		if (this.initPromise) {
-			await this.initPromise
-		}
-
 		if (
 			/^begin\b/i.test(sql) &&
 			typeof globalThis.sessionStorage !== "undefined" &&
@@ -41,7 +29,7 @@ export class CoreSQLiteDrizzle extends CoreSQLite {
 			sessionStorage._coresqlite_sent_drizzle_transaction_warning = "1"
 		}
 
-		return this.exec({ sql, params, method })
+		return await this.exec({ sql, params, method })
 	}
 
 	batchDriver = async (
@@ -51,20 +39,16 @@ export class CoreSQLiteDrizzle extends CoreSQLite {
 			method?: "get" | "all" | "run" | "values"
 		}>
 	) => {
-		if (this.initPromise) {
-			await this.initPromise
-		}
-
 		const statements: DriverStatement[] = queries.map((query) => ({
 			sql: query.sql,
 			params: query.params,
 			method: query.method || "all"
 		}))
 
-		return this.execBatch(statements)
+		return await this.execBatch(statements)
 	}
 
 	sql = async (sql: string, params?: SQLValue[]) => {
-		return this.driver(sql, params, "all")
+		return await this.driver(sql, params, "all")
 	}
 }

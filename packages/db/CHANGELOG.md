@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.10.0
+
+### Minor Changes
+
+- modify architecture for worker-only
+
 ## 0.9.4
 
 ### Patch Changes

@@ -49,9 +49,9 @@ export class CoreSQLiteKysely extends Client {
 				}
 
 				if (statements.length > 0) {
-					client.transaction(() => {
+					await client.transaction(async (tx) => {
 						for (const stmt of statements) {
-							client.run(stmt.sql, stmt.params)
+							await tx.run(stmt.sql, stmt.params)
 						}
 					})
 				}
@@ -113,7 +113,7 @@ class KyselyConnection implements DatabaseConnection {
 		let rows: Result[]
 
 		if (this.transaction === null) {
-			rows = this.client.query(query.sql, query.parameters as SQLValue[])
+			rows = (await this.client.query(query.sql, query.parameters as SQLValue[])) as Result[]
 		} else {
 			rows = await this.transaction.query(query)
 		}

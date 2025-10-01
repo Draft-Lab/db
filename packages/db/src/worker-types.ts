@@ -34,6 +34,11 @@ export interface DestroyMessage extends WorkerMessageBase {
 	payload: undefined
 }
 
+export interface TransactionMessage extends WorkerMessageBase {
+	type: "transaction"
+	payload: TransactionPayload
+}
+
 export type WorkerMessage =
 	| InitMessage
 	| ExecMessage
@@ -41,6 +46,7 @@ export type WorkerMessage =
 	| ExportMessage
 	| ImportMessage
 	| DestroyMessage
+	| TransactionMessage
 
 export interface WorkerResponseBase {
 	id: string
@@ -60,7 +66,14 @@ export interface WorkerErrorResponse extends WorkerResponseBase {
 
 export type WorkerResponse<T = unknown> = WorkerSuccessResponse<T> | WorkerErrorResponse
 
-export type WorkerMessageType = "init" | "exec" | "execBatch" | "export" | "import" | "destroy"
+export type WorkerMessageType =
+	| "init"
+	| "exec"
+	| "execBatch"
+	| "export"
+	| "import"
+	| "destroy"
+	| "transaction"
 
 export interface InitPayload {
 	databasePath: string
@@ -69,6 +82,8 @@ export interface InitPayload {
 export interface ExecPayload extends DriverStatement {}
 
 export interface ExecBatchPayload extends Array<DriverStatement> {}
+
+export interface TransactionPayload extends Array<DriverStatement> {}
 
 export interface ImportPayload {
 	data: ArrayBuffer
@@ -82,6 +97,7 @@ export interface ExportResult {
 export type InitResponse = WorkerResponse<void>
 export type ExecResponse = WorkerResponse<RawResultData>
 export type ExecBatchResponse = WorkerResponse<RawResultData[]>
+export type TransactionResponse = WorkerResponse<RawResultData[]>
 export type ExportResponse = WorkerResponse<ExportResult>
 export type ImportResponse = WorkerResponse<void>
 export type DestroyResponse = WorkerResponse<void>

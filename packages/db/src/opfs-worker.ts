@@ -5,6 +5,7 @@ import type {
 	ExportResult,
 	ImportPayload,
 	InitPayload,
+	TransactionPayload,
 	WorkerErrorResponse,
 	WorkerMessage,
 	WorkerSuccessResponse
@@ -41,6 +42,16 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 			}
 			case "execBatch": {
 				const result = await handleExecBatch(payload)
+				const response: WorkerSuccessResponse<RawResultData[]> = {
+					id,
+					success: true,
+					result
+				}
+				self.postMessage(response)
+				break
+			}
+			case "transaction": {
+				const result = await handleTransaction(payload)
 				const response: WorkerSuccessResponse<RawResultData[]> = {
 					id,
 					success: true,
@@ -112,6 +123,9 @@ const handleInit = async (config: InitPayload): Promise<void> => {
 	db.exec({ sql: "PRAGMA synchronous = NORMAL" })
 	db.exec({ sql: "PRAGMA cache_size = 5000" })
 	db.exec({ sql: "PRAGMA foreign_keys = ON" })
+	db.exec({ sql: "PRAGMA temp_store = MEMORY" })
+	db.exec({ sql: "PRAGMA mmap_size = 0" })
+	db.exec({ sql: "PRAGMA wal_autocheckpoint = 1000" })
 
 	isReady = true
 }
@@ -125,6 +139,20 @@ const handleExec = async (statement: ExecPayload): Promise<RawResultData> => {
 }
 
 const handleExecBatch = async (statements: ExecBatchPayload): Promise<RawResultData[]> => {
+	if (!isReady || !db) {
+		throw new Error("Worker database not initialized")
+	}
+
+	const results: RawResultData[] = []
+
+	for (const statement of statements) {
+		results.push(execOnDb(db, statement))
+	}
+
+	return results
+}
+
+const handleTransaction = async (statements: TransactionPayload): Promise<RawResultData[]> => {
 	if (!isReady || !db) {
 		throw new Error("Worker database not initialized")
 	}

@@ -2,17 +2,13 @@ import { QueryClientProvider } from "@tanstack/react-query"
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
 import { createRootRoute, HeadContent, Outlet } from "@tanstack/react-router"
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools"
-import { client } from "@/libs/db"
 import { queryClient } from "@/libs/query-client"
 
 export const Route = createRootRoute({
 	component: Root,
 	head: () => ({
 		meta: [{ title: "Draft DB" }]
-	}),
-	beforeLoad: async () => {
-		await client.ready()
-	}
+	})
 })
 
 function Root() {

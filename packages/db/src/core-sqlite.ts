@@ -1,12 +1,6 @@
 import { DatabaseBroadcast } from "./broadcast"
 import { mutexLock } from "./mutex-lock"
-import type {
-	DriverConfig,
-	DriverStatement,
-	RawResultData,
-	SQLite,
-	SQLiteDatabase
-} from "./types"
+import type { DriverConfig, DriverStatement, RawResultData } from "./types"
 import type {
 	WorkerErrorResponse,
 	WorkerMessage,
@@ -15,14 +9,8 @@ import type {
 } from "./worker-types"
 
 export class CoreSQLite {
-	private sqlite?: SQLite
-	private memory?: SQLiteDatabase
 	private worker?: Worker
-	private config?: DriverConfig
-	private syncQueue: DriverStatement[] = []
-	private isInitialized = false
-	private isSyncing = false
-	private isImporting = false
+	protected config?: DriverConfig
 	private messageId = 0
 	private pendingMessages = new Map<
 		string,
@@ -31,52 +19,57 @@ export class CoreSQLite {
 			reject: (error: Error) => void
 		}
 	>()
-
-	private retryCount = 0
-	private readonly maxRetries = 3
 	private broadcast?: DatabaseBroadcast
+	private isInitialized = false
+	private initMutex = this.createInitMutex()
 
-	async init(config: DriverConfig): Promise<void> {
+	setConfig(config: DriverConfig): void {
 		this.config = config
+	}
 
-		await this.initMemory()
+	private createInitMutex() {
+		let locked = false
+		const queue: Array<() => void> = []
 
-		if (typeof window !== "undefined") {
-			await this.initWorker()
-			await this.bootSync()
-
-			if (this.worker && config.databasePath) {
-				this.broadcast = new DatabaseBroadcast(config.databasePath, {
-					onReinit: async () => {
-						await this.handleBroadcastReinit()
-					},
-					onClose: async () => {
-						await this.handleBroadcastClose()
-					}
-				})
+		return {
+			async lock<T>(fn: () => Promise<T>): Promise<T> {
+				while (locked) {
+					await new Promise<void>((resolve) => queue.push(resolve))
+				}
+				locked = true
+				try {
+					return await fn()
+				} finally {
+					locked = false
+					const next = queue.shift()
+					if (next) next()
+				}
 			}
 		}
-
-		this.isInitialized = true
 	}
 
-	private async initMemory(): Promise<void> {
-		const { default: sqliteInitModule } = await import("@sqlite.org/sqlite-wasm")
-		this.sqlite = await sqliteInitModule()
+	private async ensureInit(): Promise<void> {
+		if (this.isInitialized) return
 
-		this.memory = new this.sqlite.oo1.DB(":memory:")
+		await this.initMutex.lock(async () => {
+			if (this.isInitialized) return
 
-		this.memory.exec({ sql: "PRAGMA synchronous = OFF" })
-		this.memory.exec({ sql: "PRAGMA journal_mode = MEMORY" })
-		this.memory.exec({ sql: "PRAGMA temp_store = MEMORY" })
-		this.memory.exec({ sql: "PRAGMA locking_mode = EXCLUSIVE" })
-		this.memory.exec({ sql: "PRAGMA cache_size = -64000" })
+			if (!this.config) {
+				throw new Error("@draftlab/db: No configuration provided")
+			}
+
+			await this.init(this.config)
+			this.isInitialized = true
+		})
 	}
 
-	private async initWorker(): Promise<void> {
+	private async init(config: DriverConfig): Promise<void> {
+		if (typeof window === "undefined") {
+			throw new Error("@draftlab/db: Cannot run in Node.js environment")
+		}
+
 		if (typeof Worker === "undefined") {
-			console.warn("@draftlab/db: Workers not available - running in memory-only mode")
-			return
+			throw new Error("@draftlab/db: Workers not available")
 		}
 
 		this.worker = new Worker(new URL("./opfs-worker", import.meta.url), {
@@ -100,158 +93,97 @@ export class CoreSQLite {
 		}
 
 		this.worker.onerror = (error) => {
-			console.error("Worker error:", error)
+			console.error("@draftlab/db: Worker error", error)
 		}
 
 		await this.sendToWorker<void>({
 			type: "init",
-			payload: { databasePath: this.config?.databasePath || "" }
+			payload: { databasePath: config.databasePath || "" }
+		})
+
+		if (config.databasePath) {
+			this.broadcast = new DatabaseBroadcast(config.databasePath, {
+				onReinit: async () => {
+					console.log("@draftlab/db: Reinit broadcast received")
+				},
+				onClose: async () => {
+					console.log("@draftlab/db: Close broadcast received")
+				}
+			})
+		}
+	}
+
+	async exec(statement: DriverStatement): Promise<RawResultData> {
+		await this.ensureInit()
+
+		if (!this.worker) {
+			throw new Error("@draftlab/db: Worker not available")
+		}
+
+		return await this.sendToWorker<RawResultData>({
+			type: "exec",
+			payload: statement
 		})
 	}
 
-	private async bootSync(): Promise<void> {
-		if (!this.memory) return
+	async execBatch(statements: DriverStatement[]): Promise<RawResultData[]> {
+		await this.ensureInit()
 
-		try {
-			const tables = await this.sendToWorker<RawResultData>({
-				type: "exec",
-				payload: {
-					sql: "SELECT name, sql FROM sqlite_master WHERE type='table' AND name != 'sqlite_sequence'",
-					method: "all"
-				}
-			})
-
-			for (const table of tables.rows) {
-				if (!Array.isArray(table)) continue
-				const [tableName, createSql] = table as [string, string]
-
-				try {
-					this.execOnDb(this.memory, {
-						sql: `DROP TABLE IF EXISTS "${tableName}"`,
-						method: "run"
-					})
-				} catch {}
-
-				this.execOnDb(this.memory, { sql: createSql, method: "run" })
-
-				const data = await this.sendToWorker<RawResultData>({
-					type: "exec",
-					payload: {
-						sql: `SELECT * FROM "${tableName}"`,
-						method: "all"
-					}
-				})
-
-				if (data.rows.length > 0) {
-					const placeholders = data.columns.map(() => "?").join(", ")
-					const insertSql = `INSERT INTO "${tableName}" ("${data.columns.join('", "')}")VALUES (${placeholders})`
-
-					if (this.memory) {
-						const memoryDb = this.memory
-						memoryDb.transaction(() => {
-							for (const row of data.rows) {
-								this.execOnDb(memoryDb, {
-									sql: insertSql,
-									params: Array.isArray(row) ? row : [row],
-									method: "run"
-								})
-							}
-						})
-					}
-				}
-			}
-		} catch (error) {
-			console.warn("Boot sync failed:", error)
+		if (!this.worker) {
+			throw new Error("@draftlab/db: Worker not available")
 		}
+
+		return await this.sendToWorker<RawResultData[]>({
+			type: "execBatch",
+			payload: statements
+		})
 	}
 
-	exec(statement: DriverStatement): RawResultData {
-		if (!this.isInitialized || !this.memory) {
-			throw new Error("CoreSQLite not initialized")
+	async transaction(statements: DriverStatement[]): Promise<RawResultData[]> {
+		await this.ensureInit()
+
+		if (!this.worker) {
+			throw new Error("@draftlab/db: Worker not available")
 		}
 
-		const result = this.execOnDb(this.memory, statement)
-
-		if (this.isWriteOperation(statement.sql)) {
-			this.queueForSync(statement)
-		}
-
-		return result
-	}
-
-	execBatch(statements: DriverStatement[]): RawResultData[] {
-		if (!this.isInitialized || !this.memory) {
-			throw new Error("CoreSQLite not initialized")
-		}
-
-		const results: RawResultData[] = []
-
-		if (this.memory) {
-			const memoryDb = this.memory
-			memoryDb.transaction(() => {
-				for (const statement of statements) {
-					results.push(this.execOnDb(memoryDb, statement))
-				}
-			})
-		}
-
-		const writeStatements = statements.filter((stmt) => this.isWriteOperation(stmt.sql))
-		if (writeStatements.length > 0) {
-			this.syncQueue.push(...writeStatements)
-			this.flushSyncQueue()
-		}
-
-		return results
+		return await this.sendToWorker<RawResultData[]>({
+			type: "transaction",
+			payload: statements
+		})
 	}
 
 	private async sendToWorker<T>(message: Omit<WorkerMessage, "id">): Promise<T> {
 		if (!this.worker) {
-			console.warn("@draftlab/db: Worker operation skipped (running in memory-only mode)")
-			return {} as T
+			throw new Error("@draftlab/db: Worker not available")
 		}
 
 		const id = (++this.messageId).toString()
 
 		return new Promise<T>((resolve, reject) => {
-			this.pendingMessages.set(id, {
-				resolve: (value: unknown) => resolve(value as T),
-				reject
-			})
-
-			const fullMessage = {
-				id,
-				...message
-			} as WorkerMessage
-
-			this.worker?.postMessage(fullMessage)
-
 			const timeoutMs = this.getTimeoutForOperation(message.type)
+
 			const timeoutId = setTimeout(() => {
 				if (this.pendingMessages.has(id)) {
 					this.pendingMessages.delete(id)
 					reject(
-						new Error(
-							`Worker message timeout after ${timeoutMs}ms for operation: ${message.type}`
-						)
+						new Error(`Worker timeout after ${timeoutMs}ms for operation: ${message.type}`)
 					)
 				}
 			}, timeoutMs)
 
-			const originalResolve = this.pendingMessages.get(id)?.resolve
-			const originalReject = this.pendingMessages.get(id)?.reject
+			this.pendingMessages.set(id, {
+				resolve: (value: unknown) => {
+					clearTimeout(timeoutId)
+					resolve(value as T)
+				},
+				reject: (error: Error) => {
+					clearTimeout(timeoutId)
+					reject(error)
+				}
+			})
 
-			if (originalResolve && originalReject) {
-				this.pendingMessages.set(id, {
-					resolve: (value: unknown) => {
-						clearTimeout(timeoutId)
-						originalResolve(value)
-					},
-					reject: (error: Error) => {
-						clearTimeout(timeoutId)
-						originalReject(error)
-					}
-				})
-			}
+			const fullMessage = { id, ...message } as WorkerMessage
+			this.worker?.postMessage(fullMessage)
 		})
 	}
 
@@ -265,6 +197,8 @@ export class CoreSQLite {
 				return 30000
 			case "execBatch":
 				return 15000
+			case "transaction":
+				return 15000
 			case "exec":
 				return 5000
 			case "destroy":
@@ -274,216 +208,50 @@ export class CoreSQLite {
 		}
 	}
 
-	private queueForSync(statement: DriverStatement): void {
-		this.syncQueue.push(statement)
-		this.flushSyncQueue()
-	}
-
-	private async flushSyncQueue(): Promise<void> {
-		if (this.isSyncing || this.isImporting || this.syncQueue.length === 0 || !this.worker) {
-			return
-		}
-
-		this.isSyncing = true
-		const batch = [...this.syncQueue]
-		this.syncQueue = []
-
-		try {
-			await this.sendToWorker<RawResultData[]>({
-				type: "execBatch",
-				payload: batch
-			})
-
-			this.retryCount = 0
-		} catch (error) {
-			await this.handleSyncError(error as Error, batch)
-		} finally {
-			this.isSyncing = false
-
-			if (this.syncQueue.length > 0) {
-				const delay = this.getRetryDelay()
-				setTimeout(() => this.flushSyncQueue(), delay)
-			}
-		}
-	}
-
-	private async handleSyncError(error: Error, batch: DriverStatement[]): Promise<void> {
-		this.retryCount++
-
-		if (this.retryCount <= this.maxRetries) {
-			console.warn(
-				`Worker sync failed (attempt ${this.retryCount}/${this.maxRetries}):`,
-				error.message
-			)
-
-			this.syncQueue.unshift(...batch)
-
-			if (error.message.includes("timeout") || error.message.includes("Worker")) {
-				await this.tryRecoverWorker()
-			}
-		} else {
-			console.error(
-				`Worker sync failed after ${this.maxRetries} attempts, dropping batch:`,
-				error
-			)
-			this.retryCount = 0
-
-			await this.tryRecoverWorker()
-		}
-	}
-
-	private async tryRecoverWorker(): Promise<void> {
-		if (typeof window === "undefined") {
-			return
-		}
-
-		try {
-			console.warn("Attempting to recover worker connection...")
-
-			if (this.worker) {
-				this.worker.terminate()
-				this.worker = undefined
-			}
-
-			await this.initWorker()
-			console.log("Worker recovery successful")
-		} catch (recoveryError) {
-			console.error("Worker recovery failed:", recoveryError)
-		}
-	}
-
-	private getRetryDelay(): number {
-		return Math.min(100 * 2 ** this.retryCount, 5000)
-	}
-
-	private execOnDb(db: SQLiteDatabase, statement: DriverStatement): RawResultData {
-		const result: RawResultData = { rows: [], columns: [] }
-
-		try {
-			if (statement.method === "run") {
-				db.exec({
-					sql: statement.sql,
-					bind: statement.params || [],
-					returnValue: "resultRows"
-				})
-
-				result.rows = []
-				result.columns = []
-			} else {
-				const rows = db.exec({
-					rowMode: "array",
-					sql: statement.sql,
-					bind: statement.params || [],
-					returnValue: "resultRows",
-					columnNames: result.columns
-				})
-
-				switch (statement.method) {
-					case "get":
-						result.rows = rows[0] ? [rows[0]] : []
-						break
-					case "values":
-						result.rows = rows
-						break
-					default:
-						result.rows = rows
-						break
-				}
-			}
-		} catch (error) {
-			console.error("❌ SQL execution error:", error, statement)
-			throw error
-		}
-
-		return result
-	}
-
-	private isWriteOperation(sql: string): boolean {
-		const normalized = sql.trim().toUpperCase()
-		return (
-			normalized.startsWith("INSERT") ||
-			normalized.startsWith("UPDATE") ||
-			normalized.startsWith("DELETE") ||
-			normalized.startsWith("CREATE") ||
-			normalized.startsWith("DROP") ||
-			normalized.startsWith("ALTER")
-		)
-	}
-
-	private async handleBroadcastReinit(): Promise<void> {
-		if (!this.memory || this.isImporting) {
-			return
-		}
-
-		try {
-			console.log("@draftlab/db: Reinitializing from broadcast")
-			await this.bootSync()
-		} catch (error) {
-			console.error("@draftlab/db: Failed to reinit from broadcast:", error)
-		}
-	}
-
-	private async handleBroadcastClose(): Promise<void> {
-		console.log("@draftlab/db: Another tab is performing critical operation")
-	}
-
 	async exportDatabase(): Promise<ArrayBuffer> {
+		await this.ensureInit()
+
 		if (!this.worker || !this.config?.databasePath) {
-			throw new Error("Export requires persistent storage (OPFS worker)")
+			throw new Error("@draftlab/db: Export requires persistent storage")
 		}
 
 		return await mutexLock(
 			{ databasePath: this.config.databasePath, mode: "shared" },
 			async () => {
-				this.isImporting = true
+				const result = await this.sendToWorker<{ name: string; data: ArrayBuffer }>({
+					type: "export",
+					payload: undefined
+				})
 
-				try {
-					await this.flushSyncQueue()
-
-					const result = await this.sendToWorker<{ name: string; data: ArrayBuffer }>({
-						type: "export",
-						payload: undefined
-					})
-
-					return result.data
-				} finally {
-					this.isImporting = false
-				}
+				return result.data
 			}
 		)
 	}
 
 	async importDatabase(data: ArrayBuffer): Promise<void> {
+		await this.ensureInit()
+
 		if (!this.worker || !this.config?.databasePath) {
-			throw new Error("Import requires persistent storage (OPFS worker)")
+			throw new Error("@draftlab/db: Import requires persistent storage")
 		}
 
 		return await mutexLock({ databasePath: this.config.databasePath }, async () => {
-			this.isImporting = true
+			this.broadcast?.broadcastClose()
 
-			try {
-				this.broadcast?.broadcastClose()
+			await this.sendToWorker<void>({
+				type: "import",
+				payload: { data }
+			})
 
-				await this.flushSyncQueue()
-
-				await this.sendToWorker<void>({
-					type: "import",
-					payload: { data }
-				})
-
-				await this.bootSync()
-
-				this.broadcast?.broadcastReinit()
-			} finally {
-				this.isImporting = false
-			}
+			this.broadcast?.broadcastReinit()
 		})
 	}
 
 	async destroy(): Promise<void> {
-		if (this.worker) {
-			await this.flushSyncQueue()
+		for (const [_id, pending] of this.pendingMessages) {
+			pending.reject(new Error("Worker destroyed while operation was pending"))
 		}
+		this.pendingMessages.clear()
 
 		if (this.broadcast) {
 			this.broadcast.broadcastClose()
@@ -491,16 +259,17 @@ export class CoreSQLite {
 			this.broadcast = undefined
 		}
 
-		if (this.memory) {
-			this.memory.close()
-			this.memory = undefined
-		}
-
 		if (this.worker) {
-			await this.sendToWorker<void>({
-				type: "destroy",
-				payload: undefined
-			})
+			this.worker.onmessage = null
+			this.worker.onerror = null
+
+			try {
+				await this.sendToWorker<void>({
+					type: "destroy",
+					payload: undefined
+				})
+			} catch {}
+
 			this.worker.terminate()
 			this.worker = undefined
 		}
@@ -509,14 +278,10 @@ export class CoreSQLite {
 	}
 
 	get isReady(): boolean {
-		return this.isInitialized && !!this.memory
+		return !!this.worker
 	}
 
 	get hasPersistentStorage(): boolean {
 		return !!this.worker
-	}
-
-	get pendingSyncCount(): number {
-		return this.syncQueue.length
 	}
 }
