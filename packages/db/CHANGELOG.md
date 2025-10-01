@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.9.3
+
+### Patch Changes
+
+- add more files to delete
+
 ## 0.9.2
 
 ### Patch Changes

@@ -195,9 +195,13 @@ const handleImport = async (payload: ImportPayload): Promise<void> => {
 	}
 
 	const root = await navigator.storage.getDirectory()
-	try {
-		await root.removeEntry(databasePath)
-	} catch {}
+	const filesToDelete = [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]
+
+	for (const file of filesToDelete) {
+		try {
+			await root.removeEntry(file)
+		} catch {}
+	}
 
 	tempDb.exec({
 		sql: `VACUUM main INTO '${databasePath}'`
