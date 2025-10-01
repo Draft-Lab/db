@@ -7,7 +7,16 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**", "!**/dist", "!**/.dist", "!**/.turbo", "!node_modules"]
+		"includes": [
+			"**",
+			"!**/dist",
+			"!**/.dist",
+			"!**/*.css",
+			"!**/.turbo",
+			"!node_modules",
+			"!**/.tanstack",
+			"!**/routeTree.gen.ts"
+		]
 	},
 	"formatter": {
 		"enabled": true,

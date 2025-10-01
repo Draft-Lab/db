@@ -7,6 +7,10 @@
 			"outputs": ["dist/**", ".dist/**"],
 			"inputs": ["$TURBO_DEFAULT$", ".env*"]
 		},
+		"dev": {
+			"cache": false,
+			"persistent": true
+		},
 		"clean": {
 			"cache": false
 		},

@@ -238,3 +238,6 @@ eslint.config.js
 
 # cache
 **/cache/
+
+# tanstack route gen
+**/routeTree.gen.ts

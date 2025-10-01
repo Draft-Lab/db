@@ -1,0 +1,12 @@
+{
+	"extends": "@draftlab/tsconfig/internal-package.json",
+	"compilerOptions": {
+		"baseUrl": ".",
+		"paths": {
+			"@/*": ["./src/*"],
+			"@draftlab/db": ["../../packages/db/src/index.ts"]
+		},
+		"types": ["vite/client", "@draftlab/tsconfig/reset"]
+	},
+	"include": ["vite.config.ts", "**/*.ts", "**/*.tsx"]
+}
