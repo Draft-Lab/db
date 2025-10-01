@@ -160,27 +160,48 @@ const handleImport = async (payload: ImportPayload): Promise<void> => {
 		throw new Error("Worker database not initialized")
 	}
 
-	const databasePath = db.filename
-	db.close()
-
 	const dataArray = new Uint8Array(payload.data)
-
-	await sqlite.oo1.OpfsDb.importDb(databasePath, dataArray)
+	const tempDbPath = `${db.filename}.import_temp`
 
 	try {
-		db = new sqlite.oo1.DB(databasePath, "cw", "opfs-sahpool")
-	} catch {
-		try {
-			db = new sqlite.oo1.OpfsDb(databasePath, "cw")
-		} catch {
-			db = new sqlite.oo1.DB(databasePath, "cw", "opfs")
-		}
-	}
+		await sqlite.oo1.OpfsDb.importDb(tempDbPath, dataArray)
 
-	db.exec({ sql: "PRAGMA journal_mode = WAL" })
-	db.exec({ sql: "PRAGMA synchronous = NORMAL" })
-	db.exec({ sql: "PRAGMA cache_size = 5000" })
-	db.exec({ sql: "PRAGMA foreign_keys = ON" })
+		db.exec({ sql: `ATTACH DATABASE '${tempDbPath}' AS import_temp` })
+
+		const tables = db.exec({
+			sql: "SELECT name FROM import_temp.sqlite_master WHERE type='table' AND name != 'sqlite_sequence'",
+			rowMode: "array",
+			returnValue: "resultRows"
+		}) as string[][]
+
+		for (const [tableName] of tables) {
+			db.exec({ sql: `DELETE FROM main."${tableName}"` })
+
+			db.exec({
+				sql: `INSERT INTO main."${tableName}" SELECT * FROM import_temp."${tableName}"`
+			})
+		}
+
+		db.exec({ sql: "DETACH DATABASE import_temp" })
+
+		try {
+			const root = await navigator.storage.getDirectory()
+			await root.removeEntry(tempDbPath, { recursive: false })
+		} catch (cleanupError) {
+			console.warn("Failed to clean up temporary import file:", cleanupError)
+		}
+	} catch (error) {
+		try {
+			db.exec({ sql: "DETACH DATABASE import_temp" })
+		} catch {}
+
+		try {
+			const root = await navigator.storage.getDirectory()
+			await root.removeEntry(tempDbPath, { recursive: false })
+		} catch {}
+
+		throw error
+	}
 }
 
 const handleDestroy = async (): Promise<void> => {

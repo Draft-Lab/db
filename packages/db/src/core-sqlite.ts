@@ -1,3 +1,5 @@
+import { DatabaseBroadcast } from "./broadcast"
+import { mutexLock } from "./mutex-lock"
 import type {
 	DriverConfig,
 	DriverStatement,
@@ -32,6 +34,7 @@ export class CoreSQLite {
 
 	private retryCount = 0
 	private readonly maxRetries = 3
+	private broadcast?: DatabaseBroadcast
 
 	async init(config: DriverConfig): Promise<void> {
 		this.config = config
@@ -41,6 +44,17 @@ export class CoreSQLite {
 		if (typeof window !== "undefined") {
 			await this.initWorker()
 			await this.bootSync()
+
+			if (this.worker && config.databasePath) {
+				this.broadcast = new DatabaseBroadcast(config.databasePath, {
+					onReinit: async () => {
+						await this.handleBroadcastReinit()
+					},
+					onClose: async () => {
+						await this.handleBroadcastClose()
+					}
+				})
+			}
 		}
 
 		this.isInitialized = true
@@ -110,6 +124,13 @@ export class CoreSQLite {
 			for (const table of tables.rows) {
 				if (!Array.isArray(table)) continue
 				const [tableName, createSql] = table as [string, string]
+
+				try {
+					this.execOnDb(this.memory, {
+						sql: `DROP TABLE IF EXISTS "${tableName}"`,
+						method: "run"
+					})
+				} catch {}
 
 				this.execOnDb(this.memory, { sql: createSql, method: "run" })
 
@@ -389,62 +410,85 @@ export class CoreSQLite {
 		)
 	}
 
-	async exportDatabase(): Promise<ArrayBuffer> {
-		if (!this.worker) {
-			throw new Error("Export requires persistent storage (OPFS worker)")
+	private async handleBroadcastReinit(): Promise<void> {
+		if (!this.memory || this.isImporting) {
+			return
 		}
 
-		this.isImporting = true
-
 		try {
-			await this.flushSyncQueue()
-
-			const result = await this.sendToWorker<{ name: string; data: ArrayBuffer }>({
-				type: "export",
-				payload: undefined
-			})
-
-			return result.data
-		} finally {
-			this.isImporting = false
+			console.log("@draftlab/db: Reinitializing from broadcast")
+			await this.bootSync()
+		} catch (error) {
+			console.error("@draftlab/db: Failed to reinit from broadcast:", error)
 		}
 	}
 
+	private async handleBroadcastClose(): Promise<void> {
+		console.log("@draftlab/db: Another tab is performing critical operation")
+	}
+
+	async exportDatabase(): Promise<ArrayBuffer> {
+		if (!this.worker || !this.config?.databasePath) {
+			throw new Error("Export requires persistent storage (OPFS worker)")
+		}
+
+		return await mutexLock(
+			{ databasePath: this.config.databasePath, mode: "shared" },
+			async () => {
+				this.isImporting = true
+
+				try {
+					await this.flushSyncQueue()
+
+					const result = await this.sendToWorker<{ name: string; data: ArrayBuffer }>({
+						type: "export",
+						payload: undefined
+					})
+
+					return result.data
+				} finally {
+					this.isImporting = false
+				}
+			}
+		)
+	}
+
 	async importDatabase(data: ArrayBuffer): Promise<void> {
-		if (!this.worker) {
+		if (!this.worker || !this.config?.databasePath) {
 			throw new Error("Import requires persistent storage (OPFS worker)")
 		}
 
-		this.isImporting = true
+		return await mutexLock({ databasePath: this.config.databasePath }, async () => {
+			this.isImporting = true
 
-		try {
-			await this.flushSyncQueue()
+			try {
+				this.broadcast?.broadcastClose()
 
-			await this.sendToWorker<void>({
-				type: "import",
-				payload: { data }
-			})
+				await this.flushSyncQueue()
 
-			if (this.memory) {
-				this.memory.close()
-				this.memory = new (this.sqlite as SQLite).oo1.DB(":memory:")
+				await this.sendToWorker<void>({
+					type: "import",
+					payload: { data }
+				})
 
-				this.memory.exec({ sql: "PRAGMA synchronous = OFF" })
-				this.memory.exec({ sql: "PRAGMA journal_mode = MEMORY" })
-				this.memory.exec({ sql: "PRAGMA temp_store = MEMORY" })
-				this.memory.exec({ sql: "PRAGMA locking_mode = EXCLUSIVE" })
-				this.memory.exec({ sql: "PRAGMA cache_size = -64000" })
+				await this.bootSync()
+
+				this.broadcast?.broadcastReinit()
+			} finally {
+				this.isImporting = false
 			}
-
-			await this.bootSync()
-		} finally {
-			this.isImporting = false
-		}
+		})
 	}
 
 	async destroy(): Promise<void> {
 		if (this.worker) {
 			await this.flushSyncQueue()
+		}
+
+		if (this.broadcast) {
+			this.broadcast.broadcastClose()
+			this.broadcast.close()
+			this.broadcast = undefined
 		}
 
 		if (this.memory) {
