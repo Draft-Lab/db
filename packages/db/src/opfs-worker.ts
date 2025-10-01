@@ -163,51 +163,9 @@ const handleImport = async (payload: ImportPayload): Promise<void> => {
 	const databasePath = db.filename
 	db.close()
 
-	const tempDb = new sqlite.oo1.DB(":memory:")
 	const dataArray = new Uint8Array(payload.data)
 
-	const dbPointer = tempDb.pointer
-	if (!dbPointer) {
-		tempDb.close()
-		throw new Error("Failed to get database pointer")
-	}
-
-	const pData = sqlite.wasm.alloc(dataArray.byteLength)
-	if (!pData) {
-		tempDb.close()
-		throw new Error("Failed to allocate memory")
-	}
-
-	sqlite.wasm.heap8u().set(dataArray, pData)
-
-	const rc = sqlite.capi.sqlite3_deserialize(
-		dbPointer,
-		"main",
-		pData,
-		dataArray.byteLength,
-		dataArray.byteLength,
-		sqlite.capi.SQLITE_DESERIALIZE_FREEONCLOSE | sqlite.capi.SQLITE_DESERIALIZE_RESIZEABLE
-	)
-
-	if (rc !== sqlite.capi.SQLITE_OK) {
-		tempDb.close()
-		throw new Error(`Failed to deserialize: ${sqlite.capi.sqlite3_errstr(rc)}`)
-	}
-
-	const root = await navigator.storage.getDirectory()
-	const filesToDelete = [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]
-
-	for (const file of filesToDelete) {
-		try {
-			await root.removeEntry(file)
-		} catch {}
-	}
-
-	tempDb.exec({
-		sql: `VACUUM main INTO '${databasePath}'`
-	})
-
-	tempDb.close()
+	await sqlite.oo1.OpfsDb.importDb(databasePath, dataArray)
 
 	try {
 		db = new sqlite.oo1.DB(databasePath, "cw", "opfs-sahpool")
