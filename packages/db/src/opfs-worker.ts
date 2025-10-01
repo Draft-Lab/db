@@ -194,6 +194,11 @@ const handleImport = async (payload: ImportPayload): Promise<void> => {
 		throw new Error(`Failed to deserialize: ${sqlite.capi.sqlite3_errstr(rc)}`)
 	}
 
+	const root = await navigator.storage.getDirectory()
+	try {
+		await root.removeEntry(databasePath)
+	} catch {}
+
 	tempDb.exec({
 		sql: `VACUUM main INTO '${databasePath}'`
 	})

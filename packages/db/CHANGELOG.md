@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.9.2
+
+### Patch Changes
+
+- modify logic for root dir
+
 ## 0.9.1
 
 ### Patch Changes
