@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.11.0
+
+### Minor Changes
+
+- modify worker
+
 ## 0.10.0
 
 ### Minor Changes

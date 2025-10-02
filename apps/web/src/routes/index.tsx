@@ -1,5 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { db } from "@/libs/db"
 import { Button } from "@/shared/components/button"
 
@@ -9,41 +8,38 @@ export const Route = createFileRoute("/")({
 		await db.schema
 			.createTable("users")
 			.ifNotExists()
-			.addColumn("id", "text")
+			.addColumn("id", "integer", (col) => col.primaryKey().autoIncrement())
 			.addColumn("name", "text")
 			.addColumn("email", "text")
 			.execute()
+	},
+	loader: async () => {
+		const users = await db.selectFrom("users").selectAll().execute()
+
+		return { users }
 	}
 })
 
 function RouteComponent() {
-	const { data: users } = useQuery({
-		queryKey: ["users"],
-		queryFn: async () => {
-			return await db.selectFrom("users").selectAll().execute()
-		}
-	})
+	const router = useRouter()
+	const { users } = Route.useLoaderData()
 
-	const { mutate: createUser } = useMutation({
-		mutationFn: async (data: { name: string; email: string }) => {
-			const id = crypto.randomUUID()
+	const createUser = async (data: { name: string; email: string }) => {
+		await db
+			.insertInto("users")
+			.values({
+				name: data.name,
+				email: data.email
+			})
+			.execute()
 
-			await db
-				.insertInto("users")
-				.values({
-					id,
-					name: data.name,
-					email: data.email
-				})
-				.execute()
-		}
-	})
+		router.invalidate()
+	}
 
-	const { mutate: deleteUser } = useMutation({
-		mutationFn: async ({ id }: { id: string }) => {
-			await db.deleteFrom("users").where("id", "==", id).execute()
-		}
-	})
+	const deleteUser = async (id: number) => {
+		await db.deleteFrom("users").where("id", "==", id).execute()
+		router.invalidate()
+	}
 
 	return (
 		<main className="h-dvh w-screen flex flex-col items-center justify-center p-8">
@@ -68,7 +64,7 @@ function RouteComponent() {
 						<p>Email: {user.email}</p>
 						<Button
 							onClick={() => {
-								deleteUser({ id: user.id })
+								deleteUser(user.id)
 							}}
 							variant="destructive"
 							size="sm"

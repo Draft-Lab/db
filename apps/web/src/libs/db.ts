@@ -1,9 +1,9 @@
 import { CoreSQLiteKysely } from "@draftlab/db"
-import { Kysely } from "kysely"
+import { type Generated, Kysely } from "kysely"
 
 interface Database {
 	users: {
-		id: string
+		id: Generated<number>
 		name: string
 		email: string
 	}

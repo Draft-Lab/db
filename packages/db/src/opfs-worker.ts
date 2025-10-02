@@ -121,11 +121,12 @@ const handleInit = async (config: InitPayload): Promise<void> => {
 
 	db.exec({ sql: "PRAGMA journal_mode = WAL" })
 	db.exec({ sql: "PRAGMA synchronous = NORMAL" })
-	db.exec({ sql: "PRAGMA cache_size = 5000" })
+	db.exec({ sql: "PRAGMA cache_size = -64000" })
 	db.exec({ sql: "PRAGMA foreign_keys = ON" })
 	db.exec({ sql: "PRAGMA temp_store = MEMORY" })
-	db.exec({ sql: "PRAGMA mmap_size = 0" })
+	db.exec({ sql: "PRAGMA page_size = 8192" })
 	db.exec({ sql: "PRAGMA wal_autocheckpoint = 1000" })
+	db.exec({ sql: "PRAGMA busy_timeout = 5000" })
 
 	isReady = true
 }
@@ -157,18 +158,13 @@ const handleTransaction = async (statements: TransactionPayload): Promise<RawRes
 		throw new Error("Worker database not initialized")
 	}
 
-	const results: RawResultData[] = []
-
-	if (db) {
-		const workerDb = db
-		workerDb.transaction(() => {
-			for (const statement of statements) {
-				results.push(execOnDb(workerDb, statement))
-			}
-		})
-	}
-
-	return results
+	return db.transaction("IMMEDIATE", (db) => {
+		const results: RawResultData[] = []
+		for (const statement of statements) {
+			results.push(execOnDb(db, statement))
+		}
+		return results
+	})
 }
 
 const handleExport = async (): Promise<{ name: string; data: ArrayBuffer }> => {
@@ -234,6 +230,7 @@ const handleImport = async (payload: ImportPayload): Promise<void> => {
 
 const handleDestroy = async (): Promise<void> => {
 	if (db) {
+		db.exec({ sql: "PRAGMA optimize" })
 		db.close()
 		db = undefined
 	}
@@ -244,23 +241,25 @@ const handleDestroy = async (): Promise<void> => {
 const execOnDb = (database: SQLiteDatabase, statement: DriverStatement): RawResultData => {
 	const result: RawResultData = { rows: [], columns: [] }
 
-	const rows = database.exec({
-		rowMode: "array",
-		sql: statement.sql,
-		bind: statement.params || [],
-		returnValue: "resultRows",
-		columnNames: result.columns
-	})
+	if (statement.method === "run") {
+		database.exec({
+			sql: statement.sql,
+			bind: statement.params || []
+		})
+	} else {
+		const rows = database.exec({
+			rowMode: "array",
+			sql: statement.sql,
+			bind: statement.params || [],
+			returnValue: "resultRows",
+			columnNames: result.columns
+		})
 
-	switch (statement.method) {
-		case "run":
-			break
-		case "get":
+		if (statement.method === "get") {
 			result.rows = rows[0] ? [rows[0]] : []
-			break
-		default:
+		} else {
 			result.rows = rows
-			break
+		}
 	}
 
 	return result
