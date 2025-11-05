@@ -4,7 +4,9 @@
 		"baseUrl": ".",
 		"paths": {
 			"@/*": ["./src/*"],
-			"@draftlab/db": ["../../packages/db/src/index.ts"]
+			"@draftlab/db": ["../../packages/db/src/index.ts"],
+			"@draftlab/db/kysely": ["../../packages/db/src/kysely.ts"],
+			"@draftlab/db/drizzle": ["../../packages/db/src/drizzle.ts"]
 		},
 		"types": ["vite/client", "@draftlab/tsconfig/reset"]
 	},

@@ -1,4 +1,4 @@
-import { CoreSQLiteKysely } from "@draftlab/db"
+import { CoreSQLiteKysely } from "@draftlab/db/kysely"
 import { type Generated, Kysely } from "kysely"
 
 interface Database {
