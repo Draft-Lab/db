@@ -1,18 +1,18 @@
 {
 	"name": "@draftlab/db",
-	"version": "0.12.1",
+	"version": "0.13.0",
 	"type": "module",
 	"description": "Core implementation for @draftlab/db",
 	"author": "Matheus Pergoli",
-	"main": "dist/index.js",
-	"typings": "dist/index.d.ts",
+	"main": "dist/index.mjs",
+	"typings": "dist/index.d.mts",
 	"files": [
 		"dist"
 	],
 	"exports": {
 		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
+			"import": "./dist/index.mjs",
+			"types": "./dist/index.d.mts"
 		}
 	},
 	"sideEffects": false,
