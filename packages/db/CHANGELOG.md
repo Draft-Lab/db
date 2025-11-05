@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.12.0
+
+### Minor Changes
+
+- update packages
+
 ## 0.11.0
 
 ### Minor Changes
