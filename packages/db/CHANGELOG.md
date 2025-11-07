@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.15.0
+
+### Minor Changes
+
+- add vite plugin
+
 ## 0.14.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # web
 
+## 0.1.7
+
+### Patch Changes
+
+- Updated dependencies
+  - @draftlab/db@0.15.0
+
 ## 0.1.6
 
 ### Patch Changes

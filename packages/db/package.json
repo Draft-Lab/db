@@ -1,6 +1,6 @@
 {
 	"name": "@draftlab/db",
-	"version": "0.14.0",
+	"version": "0.15.0",
 	"type": "module",
 	"description": "Core implementation for @draftlab/db",
 	"author": "Matheus Pergoli",
@@ -14,13 +14,17 @@
 			"import": "./dist/index.mjs",
 			"types": "./dist/index.d.mts"
 		},
-		"./drizzle": {
-			"import": "./dist/drizzle.mjs",
-			"types": "./dist/drizzle.d.mts"
+		"./vite": {
+			"import": "./dist/vite.mjs",
+			"types": "./dist/vite.d.mts"
 		},
 		"./kysely": {
 			"import": "./dist/kysely.mjs",
 			"types": "./dist/kysely.d.mts"
+		},
+		"./drizzle": {
+			"import": "./dist/drizzle.mjs",
+			"types": "./dist/drizzle.d.mts"
 		}
 	},
 	"sideEffects": false,
@@ -52,16 +56,21 @@
 		"drizzle-orm": "^0.44.7",
 		"kysely": "^0.28.8",
 		"tsdown": "^0.16.0",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vite": "^7.2.1"
 	},
 	"dependencies": {
 		"@sqlite.org/sqlite-wasm": "3.50.4-build1"
 	},
 	"peerDependencies": {
 		"drizzle-orm": "*",
-		"kysely": "*"
+		"kysely": "*",
+		"vite": ">=4.0.0"
 	},
 	"peerDependenciesMeta": {
+		"vite": {
+			"optional": true
+		},
 		"kysely": {
 			"optional": true
 		},

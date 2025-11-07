@@ -1,7 +1,7 @@
 {
 	"name": "web",
 	"private": true,
-	"version": "0.1.6",
+	"version": "0.1.7",
 	"type": "module",
 	"license": "MIT",
 	"scripts": {
@@ -14,7 +14,7 @@
 	},
 	"dependencies": {
 		"@draftlab/db": "workspace:*",
-		"@tanstack/react-router": "^1.134.12",
+		"@tanstack/react-router": "^1.134.13",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"kysely": "^0.28.8",
@@ -27,15 +27,15 @@
 	},
 	"devDependencies": {
 		"@draftlab/tsconfig": "workspace:*",
-		"@tailwindcss/vite": "^4.1.16",
-		"@tanstack/react-router-devtools": "^1.134.12",
-		"@tanstack/router-plugin": "^1.134.12",
+		"@tailwindcss/vite": "^4.1.17",
+		"@tanstack/react-router-devtools": "^1.134.13",
+		"@tanstack/router-plugin": "^1.134.14",
 		"@types/react": "^19.2.2",
 		"@types/react-dom": "^19.2.2",
 		"@vitejs/plugin-react": "^5.1.0",
-		"tailwindcss": "^4.1.16",
+		"tailwindcss": "^4.1.17",
 		"typescript": "^5.9.3",
-		"vite": "^7.1.12",
+		"vite": "^7.2.1",
 		"vite-tsconfig-paths": "^5.1.4"
 	}
 }
