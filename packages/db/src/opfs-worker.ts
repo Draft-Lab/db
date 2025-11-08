@@ -144,13 +144,13 @@ const handleExecBatch = async (statements: ExecBatchPayload): Promise<RawResultD
 		throw new Error("Worker database not initialized")
 	}
 
-	const results: RawResultData[] = []
-
-	for (const statement of statements) {
-		results.push(execOnDb(db, statement))
-	}
-
-	return results
+	return db.transaction("IMMEDIATE", (db) => {
+		const results: RawResultData[] = []
+		for (const statement of statements) {
+			results.push(execOnDb(db, statement))
+		}
+		return results
+	})
 }
 
 const handleTransaction = async (statements: TransactionPayload): Promise<RawResultData[]> => {

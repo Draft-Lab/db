@@ -1,6 +1,6 @@
 {
 	"name": "@draftlab/db",
-	"version": "0.15.0",
+	"version": "0.15.1",
 	"type": "module",
 	"description": "Core implementation for @draftlab/db",
 	"author": "Matheus Pergoli",
@@ -55,12 +55,12 @@
 		"@types/node": "^24.10.0",
 		"drizzle-orm": "^0.44.7",
 		"kysely": "^0.28.8",
-		"tsdown": "^0.16.0",
+		"tsdown": "^0.16.1",
 		"typescript": "^5.9.3",
-		"vite": "^7.2.1"
+		"vite": "^7.2.2"
 	},
 	"dependencies": {
-		"@sqlite.org/sqlite-wasm": "3.50.4-build1"
+		"@sqlite.org/sqlite-wasm": "3.51.0-build1"
 	},
 	"peerDependencies": {
 		"drizzle-orm": "*",
