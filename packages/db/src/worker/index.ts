@@ -1,4 +1,4 @@
-import type { DriverStatement, RawResultData, SQLite, SQLiteDatabase } from "./types"
+import type { DriverStatement, RawResultData, SQLite, SQLiteDatabase } from "../types"
 import type {
 	ExecBatchPayload,
 	ExecPayload,
@@ -9,7 +9,7 @@ import type {
 	WorkerErrorResponse,
 	WorkerMessage,
 	WorkerSuccessResponse
-} from "./worker-types"
+} from "./types"
 
 let sqlite: SQLite | undefined
 let db: SQLiteDatabase | undefined

@@ -1,12 +1,12 @@
-import { CoreSQLite } from "./core-sqlite"
-import type { SQLValue } from "./types"
+import { CoreSQLite } from "./core"
+import type { DriverConfig, SQLValue } from "./types"
 
 export class Client {
 	private db: CoreSQLite
 
-	constructor(databasePath: string) {
+	constructor(config: DriverConfig) {
 		this.db = new CoreSQLite()
-		this.db.setConfig({ databasePath })
+		this.db.setConfig(config)
 	}
 
 	async sql<T = Record<string, SQLValue>>(

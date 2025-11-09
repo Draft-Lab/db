@@ -1,15 +1,12 @@
-import { CoreSQLite } from "./core-sqlite"
-import type { DriverStatement, SQLValue } from "./types"
+import { CoreSQLite } from "../core"
+import type { DriverConfig, DriverStatement, SQLValue } from "../types"
 
 export class CoreSQLiteDrizzle extends CoreSQLite {
-	constructor(databasePath?: string) {
+	constructor(config?: DriverConfig) {
 		super()
 
-		if (databasePath) {
-			this.config = {
-				databasePath,
-				verbose: false
-			}
+		if (config) {
+			this.setConfig(config)
 		}
 	}
 

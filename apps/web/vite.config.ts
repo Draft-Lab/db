@@ -1,3 +1,4 @@
+import draftlab from "@draftlab/db/vite"
 import tailwindcss from "@tailwindcss/vite"
 import { tanstackRouter } from "@tanstack/router-plugin/vite"
 import react from "@vitejs/plugin-react"
@@ -5,9 +6,6 @@ import { defineConfig } from "vite"
 import tsconfigpaths from "vite-tsconfig-paths"
 
 export default defineConfig({
-	worker: {
-		format: "es"
-	},
 	plugins: [
 		tanstackRouter({
 			quoteStyle: "double",
@@ -17,16 +15,8 @@ export default defineConfig({
 			generatedRouteTree: "./src/routeTree.gen.ts"
 		}),
 		react(),
+		draftlab(),
 		tailwindcss(),
 		tsconfigpaths()
-	],
-	optimizeDeps: {
-		exclude: ["@sqlite.org/sqlite-wasm"]
-	},
-	server: {
-		headers: {
-			"Cross-Origin-Embedder-Policy": "require-corp",
-			"Cross-Origin-Opener-Policy": "same-origin"
-		}
-	}
+	]
 })

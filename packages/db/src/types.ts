@@ -24,10 +24,13 @@ export interface RawResultData {
 
 export type DatabasePath = string
 
+export type StorageBackend = "worker" | "memory" | "sessionStorage" | "localStorage"
+
 export interface DriverConfig {
 	verbose?: boolean
 	readOnly?: boolean
 	databasePath: DatabasePath
+	backend?: StorageBackend
 }
 
 export interface DriverStatement {
@@ -39,4 +42,16 @@ export interface DriverStatement {
 export interface Statement {
 	sql: string
 	params: SQLValue[]
+}
+
+export interface SQLiteBackend {
+	setConfig(config: DriverConfig): void
+	exec(statement: DriverStatement): Promise<RawResultData>
+	execBatch(statements: DriverStatement[]): Promise<RawResultData[]>
+	transaction(statements: DriverStatement[]): Promise<RawResultData[]>
+	exportDatabase(): Promise<ArrayBuffer>
+	importDatabase(data: ArrayBuffer): Promise<void>
+	destroy(): Promise<void>
+	isReady: boolean
+	hasPersistentStorage: boolean
 }

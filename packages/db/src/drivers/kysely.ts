@@ -8,8 +8,8 @@ import {
 	SqliteIntrospector,
 	SqliteQueryCompiler
 } from "kysely"
-import { Client } from "./client"
-import type { SQLValue } from "./types"
+import { Client } from "../client"
+import type { SQLValue } from "../types"
 
 interface Transaction {
 	query<T = Record<string, SQLValue>>(compiledQuery: unknown): Promise<T[]>

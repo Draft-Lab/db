@@ -9,5 +9,5 @@ interface Database {
 	}
 }
 
-export const client = new CoreSQLiteKysely("db.sqlite")
+export const client = new CoreSQLiteKysely({ databasePath: "mydb" })
 export const db = new Kysely<Database>({ dialect: client.dialect })

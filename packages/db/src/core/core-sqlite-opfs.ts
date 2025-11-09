@@ -1,14 +1,14 @@
-import { DatabaseBroadcast } from "./broadcast"
-import { mutexLock } from "./mutex-lock"
-import type { DriverConfig, DriverStatement, RawResultData } from "./types"
+import { DatabaseBroadcast } from "../broadcast"
+import { mutexLock } from "../mutex-lock"
+import type { DriverConfig, DriverStatement, RawResultData, SQLiteBackend } from "../types"
 import type {
 	WorkerErrorResponse,
 	WorkerMessage,
 	WorkerResponse,
 	WorkerSuccessResponse
-} from "./worker-types"
+} from "../worker/types"
 
-export class CoreSQLite {
+export class CoreSQLiteOPFS implements SQLiteBackend {
 	private worker?: Worker
 	protected config?: DriverConfig
 	private messageId = 0
@@ -72,7 +72,7 @@ export class CoreSQLite {
 			throw new Error("@draftlab/db: Workers not available")
 		}
 
-		this.worker = new Worker(new URL("./opfs-worker", import.meta.url), {
+		this.worker = new Worker(new URL("../worker/index.ts", import.meta.url), {
 			type: "module"
 		})
 

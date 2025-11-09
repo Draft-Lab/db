@@ -1,4 +1,4 @@
-import type { DriverStatement, RawResultData } from "./types"
+import type { DriverStatement, RawResultData } from "../types"
 
 export interface WorkerMessageBase {
 	id: string

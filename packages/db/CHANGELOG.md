@@ -1,5 +1,11 @@
 # @draftlab/db
 
+## 0.16.0
+
+### Minor Changes
+
+- add more backend and change structure for the codebase
+
 ## 0.15.1
 
 ### Patch Changes

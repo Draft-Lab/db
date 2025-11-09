@@ -5,8 +5,9 @@
 		"paths": {
 			"@/*": ["./src/*"],
 			"@draftlab/db": ["../../packages/db/src/index.ts"],
-			"@draftlab/db/kysely": ["../../packages/db/src/kysely.ts"],
-			"@draftlab/db/drizzle": ["../../packages/db/src/drizzle.ts"]
+			"@draftlab/db/vite": ["../../packages/db/src/vite.ts"],
+			"@draftlab/db/kysely": ["../../packages/db/src/drivers/kysely.ts"],
+			"@draftlab/db/drizzle": ["../../packages/db/src/drivers/drizzle.ts"]
 		},
 		"types": ["vite/client", "@draftlab/tsconfig/reset"]
 	},
